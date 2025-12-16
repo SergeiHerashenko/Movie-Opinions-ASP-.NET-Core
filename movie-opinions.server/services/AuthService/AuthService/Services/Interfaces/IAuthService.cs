@@ -5,9 +5,9 @@ namespace AuthService.Services.Interfaces
 {
     public interface IAuthService
     {
-        Task<AuthResult> Login(UserLoginModel loginModel);
+        Task<AuthResult> LoginAsync(UserLoginModel loginModel);
 
-        Task<AuthResult> Registration(UserRegisterModel registrationModel);
+        Task<AuthResult> RegistrationAsync(UserRegisterModel registrationModel);
 
         string GenerateJwtToken(UserTokenModel user);
     }

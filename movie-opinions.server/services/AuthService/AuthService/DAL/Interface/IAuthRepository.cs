@@ -5,8 +5,8 @@ namespace AuthService.DAL.Interface
 {
     public interface IAuthRepository
     {
-        Task<RepositoryResult<Guid>> CreateUser();
-        // Змінити повернення модделі (додати нову )
-        Task<RepositoryResult<UserLoginModel>> GetUserByEmail(string email);
+        Task<RepositoryResult<UserEntityDTO>> RegistrationUserAsync(UserEntity userEntity);
+        
+        Task<RepositoryResult<UserEntity>> GetUserByEmailAsync(string email);
     }
 }
