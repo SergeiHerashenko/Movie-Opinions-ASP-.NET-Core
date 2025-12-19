@@ -60,10 +60,23 @@ namespace AuthService.Services.Implementations
                                 "application/json"
                             );
 
-                            var response = await client.PostAsync("https://profileservice/api/profiles", content);
+                            var response = await client.PostAsync("https://localhost:7223/api/profile", content);
                             
                             if (!response.IsSuccessStatusCode)
                             {
+                                var body = await response.Content.ReadAsStringAsync();
+
+                                var profileError = JsonSerializer.Deserialize<AuthResult>(
+                                    body,
+                                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                                );
+
+                                return new AuthResult
+                                {
+                                    IsSuccess = false,
+                                    Status = profileError.Status,
+                                    Message = profileError?.Message ?? "Profile service error"
+                                };
                                 return new AuthResult
                                 {
                                     IsSuccess = false,
