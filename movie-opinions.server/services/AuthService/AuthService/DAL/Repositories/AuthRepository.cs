@@ -23,7 +23,7 @@ namespace AuthService.DAL.Repositories
                 {
                     await conn.OpenAsync();
 
-                    await using (var transaction = conn.BeginTransaction())
+                    await using (var transaction = await conn.BeginTransactionAsync())
                     {
                         try
                         {
@@ -120,20 +120,54 @@ namespace AuthService.DAL.Repositories
             }
         }
 
+        public async Task<RepositoryResult<bool>> DeleteUserAsync(Guid userId)
+        {
+            await using (var conn = new NpgsqlConnection(_connectAuthDb.GetConnectAuthDataBase()))
+            {
+                try
+                {
+                    await conn.OpenAsync();
+
+                    await using (var deleteUser = new NpgsqlCommand(
+                        "DELETE FROM " +
+                            "Users_Table " +
+                        "WHERE id_user = @ID", conn))
+                    {
+                        deleteUser.Parameters.AddWithValue("@ID", userId);
+
+                        await deleteUser.ExecuteNonQueryAsync();
+                    }
+
+                    return new RepositoryResult<bool>
+                    {
+                        StatusCode = Models.Enums.AuthStatusCode.Success
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new RepositoryResult<bool>
+                    {
+                        ErrorMessage = ex.Message,
+                        StatusCode = Models.Enums.AuthStatusCode.InternalServerError
+                    };
+                }
+            }
+        }
+
         private async Task InsertUserTableAsync(NpgsqlConnection conn, NpgsqlTransaction transaction, UserEntity entity)
         {
-            var insertUserTable = new NpgsqlCommand(
-                                "INSERT INTO " +
+            await using (var insertUserTable = new NpgsqlCommand("INSERT INTO " +
                                     "Users_Table (id_user, email_user, passwordHash_user, passwordSalt_user, registrationDate, іsEmailConfirmed) " +
-                                "VALUES (@Id, @Email, @PasswordHash, @PasswordSalt, NOW(), @IsEmailConfirmed);", conn, transaction);
+                                "VALUES (@Id, @Email, @PasswordHash, @PasswordSalt, NOW(), @IsEmailConfirmed);", conn, transaction))
+            {
+                insertUserTable.Parameters.AddWithValue("@Id", NpgsqlTypes.NpgsqlDbType.Uuid).Value = entity.UserId;
+                insertUserTable.Parameters.AddWithValue("@Email", entity.Email);
+                insertUserTable.Parameters.AddWithValue("@PasswordHash", entity.Password);
+                insertUserTable.Parameters.AddWithValue("@PasswordSalt", entity.SaltPassword);
+                insertUserTable.Parameters.AddWithValue("@IsEmailConfirmed", NpgsqlTypes.NpgsqlDbType.Boolean).Value = false;
 
-            insertUserTable.Parameters.AddWithValue("@Id", entity.UserId);
-            insertUserTable.Parameters.AddWithValue("@Email", entity.Email);
-            insertUserTable.Parameters.AddWithValue("@PasswordHash", entity.Password);
-            insertUserTable.Parameters.AddWithValue("@PasswordSalt", entity.SaltPassword);
-            insertUserTable.Parameters.AddWithValue("@IsEmailConfirmed", false);
-
-            await insertUserTable.ExecuteNonQueryAsync();
+                await insertUserTable.ExecuteNonQueryAsync();
+            }
         }
     }
 }

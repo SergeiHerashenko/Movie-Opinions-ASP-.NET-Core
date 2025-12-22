@@ -4,6 +4,7 @@ using AuthService.Models.Enums;
 using AuthService.Models.Responses;
 using AuthService.Models.User;
 using AuthService.Services.Interfaces;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 
@@ -12,10 +13,12 @@ namespace AuthService.Services.Implementations
     public class AuthServiceImplementations : IAuthService
     {
         private readonly IAuthRepository _authRepository;
+        private readonly HttpClient _httpClient;
 
-        public AuthServiceImplementations(IAuthRepository authRepository)
+        public AuthServiceImplementations(IAuthRepository authRepository, HttpClient httpClient)
         {
             _authRepository = authRepository;
+            _httpClient = httpClient;
         }
 
         public async Task<AuthResult> LoginAsync(UserLoginModel loginModel)
@@ -27,87 +30,82 @@ namespace AuthService.Services.Implementations
         {
             try
             {
+                // 1. Перевірка на існування
                 var getUser = await _authRepository.GetUserByEmailAsync(registrationModel.Email);
 
-                if(getUser.StatusCode == AuthStatusCode.UserNotFound)
+                if(getUser.StatusCode != AuthStatusCode.UserNotFound)
                 {
-                    string passwordSalt = Guid.NewGuid().ToString();
-                    string encryptionPassword = await new HashPassword().GetHashedPasswordAsync(registrationModel.Password, passwordSalt);
-
-                    var newUser = new UserEntity()
+                    return new AuthResult
                     {
-                        UserId = Guid.NewGuid(),
-                        Email = registrationModel.Email,
-                        Password = encryptionPassword,
-                        SaltPassword = passwordSalt
+                        IsSuccess = false,
+                        Status = AuthStatusCode.UserAlreadyExists,
+                        Token = null,
+                        RefreshToken = null,
+                        ExpiryDate = null,
+                        Message = getUser.ErrorMessage,
+                        Errors = null
                     };
+                }
 
-                    var registerUser = await _authRepository.RegistrationUserAsync(newUser);
+                // 2. Створення сутності
+                string passwordSalt = Guid.NewGuid().ToString();
+                string encryptionPassword = await new HashPassword().GetHashedPasswordAsync(registrationModel.Password, passwordSalt);
 
-                    if(registerUser.StatusCode == AuthStatusCode.Success)
+                var newUser = new UserEntity()
+                {
+                    UserId = Guid.NewGuid(),
+                    Email = registrationModel.Email,
+                    Password = encryptionPassword,
+                    SaltPassword = passwordSalt
+                };
+
+                // 3. Збереження в Auth базі
+                var registerUser = await _authRepository.RegistrationUserAsync(newUser);
+
+                if(registerUser.StatusCode != AuthStatusCode.Success)
+                {
+                    return new AuthResult
                     {
-                        using(var client = new HttpClient())
-                        {
-                            var profileData = new
-                            {
-                                UserId = newUser.UserId,
-                                Email = newUser.Email
-                            };
+                        IsSuccess = false,
+                        Status = registerUser.StatusCode,
+                        Token = null,
+                        RefreshToken = null,
+                        ExpiryDate = null,
+                        Message = registerUser.ErrorMessage,
+                        Errors = null
+                    };
+                }
 
-                            var content = new StringContent(
-                                JsonSerializer.Serialize(profileData),
-                                Encoding.UTF8,
-                                "application/json"
-                            );
+                // 4. HTTP виклик до ProfileService
+                var profileData = new 
+                { 
+                    UserId = newUser.UserId, 
+                    Email = newUser.Email 
+                };
 
-                            var response = await client.PostAsync("https://localhost:7223/api/profile", content);
-                            
-                            if (!response.IsSuccessStatusCode)
-                            {
-                                var body = await response.Content.ReadAsStringAsync();
+                var response = await _httpClient.PostAsJsonAsync("api/profile", profileData);
 
-                                var profileError = JsonSerializer.Deserialize<AuthResult>(
-                                    body,
-                                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                                );
+                if (!response.IsSuccessStatusCode)
+                {
+                    // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
+                    await _authRepository.DeleteUserAsync(newUser.UserId);
 
-                                return new AuthResult
-                                {
-                                    IsSuccess = false,
-                                    Status = profileError.Status,
-                                    Message = profileError?.Message ?? "Profile service error"
-                                };
-                                return new AuthResult
-                                {
-                                    IsSuccess = false,
-                                    Status = AuthStatusCode.InvalidCredentials,
-                                    Token = null,
-                                    RefreshToken = null,
-                                    ExpiryDate = null,
-                                    Message = getUser.ErrorMessage,
-                                    Errors = null
-                                };
-                            }
+                    var errorResponse = await response.Content.ReadFromJsonAsync<ServiceResponse<Guid>>() 
+                        ?? new ServiceResponse<Guid> { Message = "Сервіс профілів повернув помилку" };
 
-                            return new AuthResult
-                            {
-                                IsSuccess = true,
-                                Status = AuthStatusCode.Success,
-                                Message = "Реєстрація успішна!"
-                            };
-                        }
-                    }
+                    return new AuthResult
+                    {
+                        IsSuccess = false,
+                        Status = AuthStatusCode.InternalServerError,
+                        Message = errorResponse?.Message ?? "Сервіс профілів повернув помилку"
+                    };
                 }
 
                 return new AuthResult
                 {
-                    IsSuccess = false,
-                    Status = AuthStatusCode.UserAlreadyExists,
-                    Token = null,
-                    RefreshToken = null,
-                    ExpiryDate = null,
-                    Message = getUser.ErrorMessage,
-                    Errors = null
+                    IsSuccess = true,
+                    Status = AuthStatusCode.Success,
+                    Message = "Реєстрація успішна!"
                 };
             }
             catch(Exception ex)
@@ -115,7 +113,7 @@ namespace AuthService.Services.Implementations
                 return new AuthResult
                 {
                     IsSuccess = false,
-                    Status = AuthStatusCode.UserAlreadyExists,
+                    Status = AuthStatusCode.InternalServerError,
                     Token = null,
                     RefreshToken = null,
                     ExpiryDate = null,

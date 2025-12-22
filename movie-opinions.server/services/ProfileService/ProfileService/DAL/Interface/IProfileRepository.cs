@@ -5,9 +5,9 @@ namespace ProfileService.DAL.Interface
 {
     public interface IProfileRepository
     {
-        Task<RepositoryResult<bool>> CreateUserAsync (UserProfile profileUser);
+        Task<RepositoryResult<Guid>> CreateUserAsync (UserProfile profileUser);
 
-        Task<RepositoryResult<bool>> DeleteUserAsync(Guid userId);
+        Task<RepositoryResult<Guid>> DeleteUserAsync(Guid userId);
 
         Task<RepositoryResult<UserProfileDTO>> UpdateUserAsync(Guid userId);
 

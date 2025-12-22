@@ -8,5 +8,7 @@ namespace AuthService.DAL.Interface
         Task<RepositoryResult<UserEntityDTO>> RegistrationUserAsync(UserEntity userEntity);
         
         Task<RepositoryResult<UserEntity>> GetUserByEmailAsync(string email);
+
+        Task<RepositoryResult<bool>> DeleteUserAsync(Guid userId);
     }
 }

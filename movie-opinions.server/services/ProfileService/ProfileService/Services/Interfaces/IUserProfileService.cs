@@ -9,7 +9,7 @@ namespace ProfileService.Services.Interfaces
 
         Task<ProfileResult<List<UserSearchDTO>>> SearchUsersByNameAsync(string name);
 
-        Task<ProfileResult<bool>> CreateProfileAsync(CreateUserProfileDTO model);
+        Task<ProfileResult<Guid>> CreateProfileAsync(CreateUserProfileDTO model);
 
         Task<ProfileResult<UserProfileDTO>> UpdateProfileAsync(Guid userId, UpdateProfileDTO model);
 

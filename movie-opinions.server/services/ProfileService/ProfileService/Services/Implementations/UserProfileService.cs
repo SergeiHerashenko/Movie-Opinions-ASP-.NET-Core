@@ -14,14 +14,14 @@ namespace ProfileService.Services.Implementations
             _profileRepository = profileRepository;
         }
 
-        public async Task<ProfileResult<bool>> CreateProfileAsync(CreateUserProfileDTO model)
+        public async Task<ProfileResult<Guid>> CreateProfileAsync(CreateUserProfileDTO model)
         {
             try
             {
                 var newUser = new UserProfile()
                 {
                     UserId = model.UserId,
-                    UserName = model.Email,
+                    UserName = model.Email.Split('@')[0],
                     FirstName = null,
                     LastName = null,
                     PhoneNumber = null,
@@ -35,28 +35,31 @@ namespace ProfileService.Services.Implementations
 
                 if(createUserProfile.StatusCode == Models.Enums.ProfileStatusCode.ProfileCreated)
                 {
-                    return new ProfileResult<bool>
+                    return new ProfileResult<Guid>
                     {
                         IsSuccess = true,
                         StatusCode = Models.Enums.ProfileStatusCode.ProfileCreated,
-                        Message = "Користувача створенно!"
+                        Message = "Користувача створенно!",
+                        Data = model.UserId
                     };
                 }
 
-                return new ProfileResult<bool>
+                return new ProfileResult<Guid>
                 {
                     IsSuccess = false,
                     StatusCode = createUserProfile.StatusCode,
                     Message = createUserProfile.ErrorMessage,
+                    Data = model.UserId
                 };
             }
             catch (Exception ex)
             {
-                return new ProfileResult<bool>
+                return new ProfileResult<Guid>
                 {
                     IsSuccess = false,
                     StatusCode = Models.Enums.ProfileStatusCode.ProfileInternalError,
                     Message = ex.Message,
+                    Data = model.UserId
                 };
             }
         }
