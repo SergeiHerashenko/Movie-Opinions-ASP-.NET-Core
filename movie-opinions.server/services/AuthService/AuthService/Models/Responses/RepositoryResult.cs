@@ -6,6 +6,8 @@ namespace AuthService.Models.Responses
     {
         public T? Data { get; set; }
 
+        public string? Message { get; set; }
+
         public string? ErrorMessage { get; set; }
 
         public AuthStatusCode StatusCode { get; set; }

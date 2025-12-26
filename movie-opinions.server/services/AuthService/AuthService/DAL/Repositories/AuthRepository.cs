@@ -1,5 +1,6 @@
 ﻿using AuthService.DAL.Connect_Database;
 using AuthService.DAL.Interface;
+using AuthService.Models.Enums;
 using AuthService.Models.Responses;
 using AuthService.Models.User;
 using Npgsql;
@@ -15,7 +16,7 @@ namespace AuthService.DAL.Repositories
             _connectAuthDb = connectAuthDb;
         }
 
-        public async Task<RepositoryResult<UserEntityDTO>> RegistrationUserAsync(UserEntity userEntity)
+        public async Task<RepositoryResult<UserEntityDTO>> CreateUserAsync(UserEntity userEntity)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthDb.GetConnectAuthDataBase()))
             {
@@ -36,9 +37,11 @@ namespace AuthService.DAL.Repositories
                                 Data = new UserEntityDTO()
                                 {
                                     UserId = userEntity.UserId,
-                                    Email = userEntity.Email
+                                    Email = userEntity.Email,
+                                    IsEmailConfirmed = userEntity.IsEmailConfirmed
                                 },
-                                StatusCode = Models.Enums.AuthStatusCode.Success
+                                StatusCode = Models.Enums.AuthStatusCode.UserCreated,
+                                Message = "Користувача створено!"
                             };
                         }
                         catch (Exception ex)
@@ -74,7 +77,7 @@ namespace AuthService.DAL.Repositories
 
                     await using (var getUserCommand = new NpgsqlCommand(
                         "SELECT " +
-                            "id_user, email_user, passwordHash_user, passwordSalt_user " +
+                            "id_user, email_user, password_hash_user, password_salt_user, registration_date, is_email_confirmed, is_blocked, is_deleted, role " +
                         "FROM " +
                             "Users_Table " +
                         "WHERE " +
@@ -86,18 +89,13 @@ namespace AuthService.DAL.Repositories
                         {
                             if (await readerInformationUser.ReadAsync())
                             {
-                                UserEntity userEntity = new UserEntity()
-                                {
-                                    UserId = Guid.Parse(readerInformationUser["id_user"].ToString()),
-                                    Email = readerInformationUser["email_user"].ToString(),
-                                    Password = readerInformationUser["passwordHash_user"].ToString(),
-                                    SaltPassword = readerInformationUser["passwordSalt_user"].ToString()
-                                };
+                                var userEntity = MapReaderToUser(readerInformationUser);
 
                                 return new RepositoryResult<UserEntity>()
                                 {
                                     Data = userEntity,
-                                    StatusCode = Models.Enums.AuthStatusCode.UserAlreadyExists
+                                    StatusCode = Models.Enums.AuthStatusCode.UserFound,
+                                    Message = "Користувача знайдено!"
                                 };
                             }
                         }
@@ -106,7 +104,7 @@ namespace AuthService.DAL.Repositories
                     return new RepositoryResult<UserEntity>()
                     {
                         StatusCode = Models.Enums.AuthStatusCode.UserNotFound,
-                        ErrorMessage = "Користувача не знайдено!"
+                        Message = "Користувача не знайдено!"
                     };
                 }
                 catch (Exception ex)
@@ -140,7 +138,8 @@ namespace AuthService.DAL.Repositories
 
                     return new RepositoryResult<bool>
                     {
-                        StatusCode = Models.Enums.AuthStatusCode.Success
+                        StatusCode = Models.Enums.AuthStatusCode.UserDeleted,
+                        Message = "Користувача видалено!"
                     };
                 }
                 catch (Exception ex)
@@ -154,20 +153,90 @@ namespace AuthService.DAL.Repositories
             }
         }
 
+        public async Task<RepositoryResult<UserEntity>> GetUserByIdAsync(Guid userId)
+        {
+            await using (var conn = new NpgsqlConnection(_connectAuthDb.GetConnectAuthDataBase()))
+            {
+                try
+                {
+                    await conn.OpenAsync();
+
+                    await using (var getUserCommand = new NpgsqlCommand(
+                        "SELECT " +
+                            "id_user, email_user, password_hash_user, password_salt_user, registration_date, is_email_confirmed, is_blocked, is_deleted, role " +
+                        "FROM " +
+                            "Users_Table " +
+                        "WHERE " +
+                            "id_user = @IdUser", conn))
+                    {
+                        getUserCommand.Parameters.AddWithValue("@IdUser", userId);
+
+                        await using (var readerInformationUser = await getUserCommand.ExecuteReaderAsync())
+                        {
+                            if (await readerInformationUser.ReadAsync())
+                            {
+                                var userEntity = MapReaderToUser(readerInformationUser);
+
+                                return new RepositoryResult<UserEntity>()
+                                {
+                                    Data = userEntity,
+                                    StatusCode = Models.Enums.AuthStatusCode.UserFound,
+                                    Message = "Користувача знайдено!"
+                                };
+                            }
+                        }
+                    }
+
+                    return new RepositoryResult<UserEntity>()
+                    {
+                        StatusCode = Models.Enums.AuthStatusCode.UserNotFound,
+                        Message = "Користувача не знайдено!"
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new RepositoryResult<UserEntity>()
+                    {
+                        StatusCode = Models.Enums.AuthStatusCode.InternalServerError,
+                        ErrorMessage = ex.Message
+                    };
+                }
+            }
+        }
+
         private async Task InsertUserTableAsync(NpgsqlConnection conn, NpgsqlTransaction transaction, UserEntity entity)
         {
             await using (var insertUserTable = new NpgsqlCommand("INSERT INTO " +
-                                    "Users_Table (id_user, email_user, passwordHash_user, passwordSalt_user, registrationDate, іsEmailConfirmed) " +
-                                "VALUES (@Id, @Email, @PasswordHash, @PasswordSalt, NOW(), @IsEmailConfirmed);", conn, transaction))
+                                    "Users_Table (id_user, email_user, password_hash_user, password_salt_user, registration_date, is_email_confirmed, is_blocked, is_deleted, role) " +
+                                "VALUES (@Id, @Email, @PasswordHash, @PasswordSalt, NOW(), @IsEmailConfirmed, @IsBlocked, @IsDeleted, @Role);", conn, transaction))
             {
                 insertUserTable.Parameters.AddWithValue("@Id", NpgsqlTypes.NpgsqlDbType.Uuid).Value = entity.UserId;
                 insertUserTable.Parameters.AddWithValue("@Email", entity.Email);
-                insertUserTable.Parameters.AddWithValue("@PasswordHash", entity.Password);
-                insertUserTable.Parameters.AddWithValue("@PasswordSalt", entity.SaltPassword);
+                insertUserTable.Parameters.AddWithValue("@PasswordHash", entity.PasswordHash);
+                insertUserTable.Parameters.AddWithValue("@PasswordSalt", entity.PasswordSalt);
                 insertUserTable.Parameters.AddWithValue("@IsEmailConfirmed", NpgsqlTypes.NpgsqlDbType.Boolean).Value = false;
+                insertUserTable.Parameters.AddWithValue("@IsBlocked", NpgsqlTypes.NpgsqlDbType.Boolean).Value = false;
+                insertUserTable.Parameters.AddWithValue("@IsDeleted", NpgsqlTypes.NpgsqlDbType.Boolean).Value = false;
+                insertUserTable.Parameters.AddWithValue("@Role", (int)entity.Role);
 
                 await insertUserTable.ExecuteNonQueryAsync();
             }
+        }
+
+        private UserEntity MapReaderToUser(NpgsqlDataReader reader)
+        {
+            return new UserEntity()
+            {
+                UserId = Guid.Parse(reader["id_user"].ToString()),
+                Email = reader["email_user"].ToString(),
+                PasswordHash = reader["password_hash_user"].ToString(),
+                PasswordSalt = reader["password_salt_user"].ToString(),
+                Role = (Role)Convert.ToInt32(reader["role"]),
+                CreatedAt = Convert.ToDateTime(reader["registration_date"]),
+                IsEmailConfirmed = Convert.ToBoolean(reader["is_email_confirmed"]),
+                IsBlocked = Convert.ToBoolean(reader["is_blocked"]),
+                IsDeleted = Convert.ToBoolean(reader["is_deleted"]),
+            };
         }
     }
 }

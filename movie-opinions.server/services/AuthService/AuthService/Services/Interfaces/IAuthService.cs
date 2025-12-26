@@ -8,7 +8,5 @@ namespace AuthService.Services.Interfaces
         Task<AuthResult> LoginAsync(UserLoginModel loginModel);
 
         Task<AuthResult> RegistrationAsync(UserRegisterModel registrationModel);
-
-        string GenerateJwtToken(UserTokenModel user);
     }
 }
