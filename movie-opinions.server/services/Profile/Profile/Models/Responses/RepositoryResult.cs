@@ -8,7 +8,7 @@ namespace Profile.Models.Responses
 
         public T? Data { get; set; }
 
-        public string? ErrorMessage { get; set; }
+        public string? Message { get; set; }
 
         public ProfileStatusCode StatusCode { get; set; }
     }

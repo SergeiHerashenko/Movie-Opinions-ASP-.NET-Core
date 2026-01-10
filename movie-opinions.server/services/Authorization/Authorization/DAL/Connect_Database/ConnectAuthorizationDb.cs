@@ -13,6 +13,7 @@
 
         // Порт підключення до бази даних /Database connection port/
         public string Port { get; private set; } = "";
+
         // Назва бази даних /The name of the database/
         public string DatabaseName { get; private set; } = "";
 

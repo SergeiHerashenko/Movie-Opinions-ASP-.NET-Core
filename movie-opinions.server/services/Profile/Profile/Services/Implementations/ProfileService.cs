@@ -48,7 +48,7 @@ namespace Profile.Services.Implementations
                 {
                     IsSuccess = false,
                     StatusCode = createUserProfile.StatusCode,
-                    Message = createUserProfile.ErrorMessage,
+                    Message = createUserProfile.Message,
                     Data = model.UserId
                 };
             }

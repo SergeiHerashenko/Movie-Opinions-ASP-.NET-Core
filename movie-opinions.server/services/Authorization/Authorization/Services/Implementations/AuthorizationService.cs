@@ -142,6 +142,10 @@ namespace Authorization.Services.Implementations
                     };
                 }
 
+                // 5. HTTP виклик до NotificationService
+                // Доробити
+
+
                 var tokenModel = new UserTokenModel()
                 {
                     UserId = registerUser.Data.UserId,

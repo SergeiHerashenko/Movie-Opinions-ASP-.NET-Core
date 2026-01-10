@@ -7,7 +7,7 @@ namespace Authorization.DAL.Interface
     {
         Task<RepositoryResult<UserEntityDTO>> CreateUserAsync(UserEntity userEntity);
 
-        Task<RepositoryResult<bool>> DeleteUserAsync(Guid userId);
+        Task<RepositoryResult<Guid>> DeleteUserAsync(Guid userId);
 
         Task<RepositoryResult<UserEntity>> GetUserByEmailAsync(string email);
 

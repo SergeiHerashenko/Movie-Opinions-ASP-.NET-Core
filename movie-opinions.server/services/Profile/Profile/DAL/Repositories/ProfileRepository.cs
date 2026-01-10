@@ -44,6 +44,7 @@ namespace Profile.DAL.Repositories
                     {
                         IsSuccess = true,
                         StatusCode = Models.Enums.ProfileStatusCode.ProfileCreated,
+                        Message = "Користувач створений!",
                         Data = profileUser.UserId
                     };
                 }
@@ -53,29 +54,63 @@ namespace Profile.DAL.Repositories
                     {
                         IsSuccess = false,
                         StatusCode = Models.Enums.ProfileStatusCode.ProfileInternalError,
-                        ErrorMessage = ex.Message,
+                        Message = ex.Message,
                         Data = profileUser.UserId
                     };
                 }
             }
         }
 
-        public Task<RepositoryResult<Guid>> DeleteUserAsync(Guid userId)
+        public async Task<RepositoryResult<Guid>> DeleteUserAsync(Guid userId)
+        {
+            await using (var conn = new NpgsqlConnection(_connectProfileDb.GetConnectProfileDataBase()))
+            {
+                try
+                {
+                    await conn.OpenAsync();
+
+                    await using (var deleteUser = new NpgsqlCommand(
+                        "DELETE FROM " +
+                            "Users_Profile_Table " +
+                        "WHERE id_user = @ID", conn))
+                    {
+                        deleteUser.Parameters.AddWithValue("@ID", userId);
+
+                        await deleteUser.ExecuteNonQueryAsync();
+                    }
+
+                    return new RepositoryResult<Guid>
+                    {
+                        IsSuccess = true,
+                        StatusCode = Models.Enums.ProfileStatusCode.ProfileDeleted,
+                        Message = "Користувача видалено!",
+                        Data = userId
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new RepositoryResult<Guid>
+                    {
+                        IsSuccess = false,
+                        StatusCode = Models.Enums.ProfileStatusCode.ProfileInternalError,
+                        Message = ex.Message,
+                        Data = userId
+                    };
+                }
+            }
+        }
+
+        public async Task<RepositoryResult<List<UserSearchDTO>>> GetSearchUsersByNameAsync(string searchName)
         {
             throw new NotImplementedException();
         }
 
-        public Task<RepositoryResult<List<UserSearchDTO>>> GetSearchUsersByNameAsync(string searchName)
+        public async Task<RepositoryResult<UserProfileDTO>> GetUserById(Guid userId)
         {
             throw new NotImplementedException();
         }
 
-        public Task<RepositoryResult<UserProfileDTO>> GetUserById(Guid userId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<RepositoryResult<UserProfileDTO>> UpdateUserAsync(Guid userId)
+        public async Task<RepositoryResult<UserProfileDTO>> UpdateUserAsync(Guid userId)
         {
             throw new NotImplementedException();
         }

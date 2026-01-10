@@ -36,14 +36,15 @@ namespace Authorization.DAL.Repositories
 
                             return new RepositoryResult<UserEntityDTO>()
                             {
+                                IsSuccess = true,
+                                StatusCode = Models.Enums.AuthorizationStatusCode.UserCreated,
+                                Message = "Користувача створено!",
                                 Data = new UserEntityDTO()
                                 {
                                     UserId = userEntity.UserId,
                                     Email = userEntity.Email,
                                     IsEmailConfirmed = userEntity.IsEmailConfirmed
                                 },
-                                StatusCode = Models.Enums.AuthorizationStatusCode.UserCreated,
-                                Message = "Користувача створено!"
                             };
                         }
                         catch (Exception ex)
@@ -52,8 +53,9 @@ namespace Authorization.DAL.Repositories
 
                             return new RepositoryResult<UserEntityDTO>()
                             {
+                                IsSuccess = false,
+                                StatusCode = Models.Enums.AuthorizationStatusCode.DatabaseFailure,
                                 Message = ex.Message,
-                                StatusCode = Models.Enums.AuthorizationStatusCode.DatabaseFailure
                             };
                         }
                     }
@@ -62,8 +64,9 @@ namespace Authorization.DAL.Repositories
                 {
                     return new RepositoryResult<UserEntityDTO>()
                     {
-                        Message = ex.Message,
-                        StatusCode = Models.Enums.AuthorizationStatusCode.InternalServerError
+                        IsSuccess = false,
+                        StatusCode = Models.Enums.AuthorizationStatusCode.InternalServerError,
+                        Message = ex.Message
                     };
                 }
             }
@@ -95,9 +98,10 @@ namespace Authorization.DAL.Repositories
 
                                 return new RepositoryResult<UserEntity>()
                                 {
-                                    Data = userEntity,
+                                    IsSuccess = true,
                                     StatusCode = Models.Enums.AuthorizationStatusCode.UserFound,
-                                    Message = "Користувача знайдено!"
+                                    Message = "Користувача знайдено!",
+                                    Data = userEntity
                                 };
                             }
                         }
@@ -105,6 +109,7 @@ namespace Authorization.DAL.Repositories
 
                     return new RepositoryResult<UserEntity>()
                     {
+                        IsSuccess = false,
                         StatusCode = Models.Enums.AuthorizationStatusCode.UserNotFound,
                         Message = "Користувача не знайдено!"
                     };
@@ -113,6 +118,7 @@ namespace Authorization.DAL.Repositories
                 {
                     return new RepositoryResult<UserEntity>()
                     {
+                        IsSuccess = false,
                         StatusCode = Models.Enums.AuthorizationStatusCode.InternalServerError,
                         Message = ex.Message
                     };
@@ -120,7 +126,7 @@ namespace Authorization.DAL.Repositories
             }
         }
 
-        public async Task<RepositoryResult<bool>> DeleteUserAsync(Guid userId)
+        public async Task<RepositoryResult<Guid>> DeleteUserAsync(Guid userId)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -138,18 +144,21 @@ namespace Authorization.DAL.Repositories
                         await deleteUser.ExecuteNonQueryAsync();
                     }
 
-                    return new RepositoryResult<bool>
+                    return new RepositoryResult<Guid>
                     {
+                        IsSuccess = true,
                         StatusCode = Models.Enums.AuthorizationStatusCode.UserDeleted,
-                        Message = "Користувача видалено!"
+                        Message = "Користувача видалено!",
+                        Data = userId
                     };
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResult<bool>
+                    return new RepositoryResult<Guid>
                     {
-                        Message = ex.Message,
-                        StatusCode = Models.Enums.AuthorizationStatusCode.InternalServerError
+                        IsSuccess = false,
+                        StatusCode = Models.Enums.AuthorizationStatusCode.InternalServerError,
+                        Message = ex.Message
                     };
                 }
             }
@@ -181,9 +190,10 @@ namespace Authorization.DAL.Repositories
 
                                 return new RepositoryResult<UserEntity>()
                                 {
-                                    Data = userEntity,
+                                    IsSuccess = true,
                                     StatusCode = Models.Enums.AuthorizationStatusCode.UserFound,
-                                    Message = "Користувача знайдено!"
+                                    Message = "Користувача знайдено!",
+                                    Data = userEntity
                                 };
                             }
                         }
@@ -191,6 +201,7 @@ namespace Authorization.DAL.Repositories
 
                     return new RepositoryResult<UserEntity>()
                     {
+                        IsSuccess = false,
                         StatusCode = Models.Enums.AuthorizationStatusCode.UserNotFound,
                         Message = "Користувача не знайдено!"
                     };
@@ -199,6 +210,7 @@ namespace Authorization.DAL.Repositories
                 {
                     return new RepositoryResult<UserEntity>()
                     {
+                        IsSuccess = false,
                         StatusCode = Models.Enums.AuthorizationStatusCode.InternalServerError,
                         Message = ex.Message
                     };
