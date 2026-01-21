@@ -1,8 +1,9 @@
-﻿using Npgsql;
+﻿using MovieOpinions.Contracts.Models;
+using MovieOpinions.Contracts.Models.RepositoryResponse;
+using Npgsql;
 using Profile.DAL.Connect_Database;
 using Profile.DAL.Interface;
 using Profile.Models.Profile;
-using Profile.Models.Responses;
 
 namespace Profile.DAL.Repositories
 {
@@ -15,7 +16,7 @@ namespace Profile.DAL.Repositories
             _connectProfileDb = connectProfileDb;
         }
 
-        public async Task<RepositoryResult<Guid>> CreateUserAsync(UserProfile profileUser)
+        public async Task<RepositoryResponse<Guid>> CreateUserAsync(UserProfile profileUser)
         {
             using (var conn = new NpgsqlConnection(_connectProfileDb.GetConnectProfileDataBase()))
             {
@@ -40,20 +41,20 @@ namespace Profile.DAL.Repositories
                         await createUser.ExecuteNonQueryAsync();
                     }
 
-                    return new RepositoryResult<Guid>
+                    return new RepositoryResponse<Guid>
                     {
                         IsSuccess = true,
-                        StatusCode = Models.Enums.ProfileStatusCode.ProfileCreated,
+                        StatusCode = StatusCode.Create.Created,
                         Message = "Користувач створений!",
                         Data = profileUser.UserId
                     };
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResult<Guid>
+                    return new RepositoryResponse<Guid>
                     {
                         IsSuccess = false,
-                        StatusCode = Models.Enums.ProfileStatusCode.ProfileInternalError,
+                        StatusCode = StatusCode.General.InternalError,
                         Message = ex.Message,
                         Data = profileUser.UserId
                     };
@@ -61,7 +62,7 @@ namespace Profile.DAL.Repositories
             }
         }
 
-        public async Task<RepositoryResult<Guid>> DeleteUserAsync(Guid userId)
+        public async Task<RepositoryResponse<Guid>> DeleteUserAsync(Guid userId)
         {
             await using (var conn = new NpgsqlConnection(_connectProfileDb.GetConnectProfileDataBase()))
             {
@@ -79,20 +80,20 @@ namespace Profile.DAL.Repositories
                         await deleteUser.ExecuteNonQueryAsync();
                     }
 
-                    return new RepositoryResult<Guid>
+                    return new RepositoryResponse<Guid>
                     {
                         IsSuccess = true,
-                        StatusCode = Models.Enums.ProfileStatusCode.ProfileDeleted,
+                        StatusCode = StatusCode.Delete.Ok,
                         Message = "Користувача видалено!",
                         Data = userId
                     };
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResult<Guid>
+                    return new RepositoryResponse<Guid>
                     {
                         IsSuccess = false,
-                        StatusCode = Models.Enums.ProfileStatusCode.ProfileInternalError,
+                        StatusCode = StatusCode.General.InternalError,
                         Message = ex.Message,
                         Data = userId
                     };
@@ -100,17 +101,17 @@ namespace Profile.DAL.Repositories
             }
         }
 
-        public async Task<RepositoryResult<List<UserSearchDTO>>> GetSearchUsersByNameAsync(string searchName)
+        public async Task<RepositoryResponse<List<UserSearchDTO>>> GetSearchUsersByNameAsync(string searchName)
         {
             throw new NotImplementedException();
         }
 
-        public async Task<RepositoryResult<UserProfileDTO>> GetUserById(Guid userId)
+        public async Task<RepositoryResponse<UserProfileDTO>> GetUserById(Guid userId)
         {
             throw new NotImplementedException();
         }
 
-        public async Task<RepositoryResult<UserProfileDTO>> UpdateUserAsync(Guid userId)
+        public async Task<RepositoryResponse<UserProfileDTO>> UpdateUserAsync(Guid userId)
         {
             throw new NotImplementedException();
         }

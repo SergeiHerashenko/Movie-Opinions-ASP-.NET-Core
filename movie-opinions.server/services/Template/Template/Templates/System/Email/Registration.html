@@ -1,0 +1,40 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .container {
+            font-family: sans-serif;
+            padding: 20px;
+            border: 1px solid #eee;
+        }
+
+        .header {
+            color: #2d89ef;
+            font-size: 24px;
+        }
+
+        .code {
+            font-weight: bold;
+            color: #e81123;
+            font-size: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #888;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">Привіт, {{UserName}}!</div>
+        <p>Дякуємо за реєстрацію в нашому додатку <strong>{{AppName}}</strong>.</p>
+        <p>Твій тимчасовий пароль: <span class="code">{{TempPassword}}</span></p>
+        <hr>
+        <div class="footer">
+            Ви отримали це повідомлення, тому що зареєструвалися на сайті {{SiteUrl}}.
+        </div>
+    </div>
+</body>
+</html>

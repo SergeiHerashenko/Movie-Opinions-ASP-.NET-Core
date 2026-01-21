@@ -1,18 +1,18 @@
-﻿using Profile.Models.Profile;
-using Profile.Models.Responses;
+﻿using MovieOpinions.Contracts.Models.RepositoryResponse;
+using Profile.Models.Profile;
 
 namespace Profile.DAL.Interface
 {
     public interface IProfileRepository
     {
-        Task<RepositoryResult<Guid>> CreateUserAsync(UserProfile profileUser);
+        Task<RepositoryResponse<Guid>> CreateUserAsync(UserProfile profileUser);
 
-        Task<RepositoryResult<Guid>> DeleteUserAsync(Guid userId);
+        Task<RepositoryResponse<Guid>> DeleteUserAsync(Guid userId);
 
-        Task<RepositoryResult<UserProfileDTO>> UpdateUserAsync(Guid userId);
+        Task<RepositoryResponse<UserProfileDTO>> UpdateUserAsync(Guid userId);
 
-        Task<RepositoryResult<UserProfileDTO>> GetUserById(Guid userId);
+        Task<RepositoryResponse<UserProfileDTO>> GetUserById(Guid userId);
 
-        Task<RepositoryResult<List<UserSearchDTO>>> GetSearchUsersByNameAsync(string searchName);
+        Task<RepositoryResponse<List<UserSearchDTO>>> GetSearchUsersByNameAsync(string searchName);
     }
 }

@@ -1,11 +1,10 @@
 ﻿using Authorization.DAL.Connect_Database;
 using Authorization.DAL.Interface;
-using Authorization.Models.Enums;
-using Authorization.Models.Responses;
+using MovieOpinions.Contracts.Enum;
 using Authorization.Models.User;
+using MovieOpinions.Contracts.Models.RepositoryResponse;
+using MovieOpinions.Contracts.Models;
 using Npgsql;
-using System.Data;
-using System.Reflection;
 
 namespace Authorization.DAL.Repositories
 {
@@ -18,7 +17,7 @@ namespace Authorization.DAL.Repositories
             _connectAuthorizationhDb = connectAuthorizationDb;
         }
 
-        public async Task<RepositoryResult<UserEntityDTO>> CreateUserAsync(UserEntity userEntity)
+        public async Task<RepositoryResponse<UserEntityDTO>> CreateUserAsync(UserEntity userEntity)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -34,10 +33,10 @@ namespace Authorization.DAL.Repositories
 
                             await transaction.CommitAsync();
 
-                            return new RepositoryResult<UserEntityDTO>()
+                            return new RepositoryResponse<UserEntityDTO>()
                             {
                                 IsSuccess = true,
-                                StatusCode = Models.Enums.AuthorizationStatusCode.UserCreated,
+                                StatusCode = StatusCode.Create.Created,
                                 Message = "Користувача створено!",
                                 Data = new UserEntityDTO()
                                 {
@@ -51,10 +50,10 @@ namespace Authorization.DAL.Repositories
                         {
                             await transaction.RollbackAsync();
 
-                            return new RepositoryResult<UserEntityDTO>()
+                            return new RepositoryResponse<UserEntityDTO>()
                             {
                                 IsSuccess = false,
-                                StatusCode = Models.Enums.AuthorizationStatusCode.DatabaseFailure,
+                                StatusCode = StatusCode.General.InternalError,
                                 Message = ex.Message,
                             };
                         }
@@ -62,17 +61,17 @@ namespace Authorization.DAL.Repositories
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResult<UserEntityDTO>()
+                    return new RepositoryResponse<UserEntityDTO>()
                     {
                         IsSuccess = false,
-                        StatusCode = Models.Enums.AuthorizationStatusCode.InternalServerError,
+                        StatusCode = StatusCode.General.InternalError,
                         Message = ex.Message
                     };
                 }
             }
         }
 
-        public async Task<RepositoryResult<UserEntity>> GetUserByEmailAsync(string email)
+        public async Task<RepositoryResponse<UserEntity>> GetUserByEmailAsync(string email)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -96,10 +95,10 @@ namespace Authorization.DAL.Repositories
                             {
                                 var userEntity = MapReaderToUser(readerInformationUser);
 
-                                return new RepositoryResult<UserEntity>()
+                                return new RepositoryResponse<UserEntity>()
                                 {
                                     IsSuccess = true,
-                                    StatusCode = Models.Enums.AuthorizationStatusCode.UserFound,
+                                    StatusCode = StatusCode.General.Ok,
                                     Message = "Користувача знайдено!",
                                     Data = userEntity
                                 };
@@ -107,26 +106,26 @@ namespace Authorization.DAL.Repositories
                         }
                     }
 
-                    return new RepositoryResult<UserEntity>()
+                    return new RepositoryResponse<UserEntity>()
                     {
                         IsSuccess = false,
-                        StatusCode = Models.Enums.AuthorizationStatusCode.UserNotFound,
+                        StatusCode = StatusCode.General.NotFound,
                         Message = "Користувача не знайдено!"
                     };
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResult<UserEntity>()
+                    return new RepositoryResponse<UserEntity>()
                     {
                         IsSuccess = false,
-                        StatusCode = Models.Enums.AuthorizationStatusCode.InternalServerError,
+                        StatusCode = StatusCode.General.InternalError,
                         Message = ex.Message
                     };
                 }
             }
         }
 
-        public async Task<RepositoryResult<Guid>> DeleteUserAsync(Guid userId)
+        public async Task<RepositoryResponse<Guid>> DeleteUserAsync(Guid userId)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -144,27 +143,27 @@ namespace Authorization.DAL.Repositories
                         await deleteUser.ExecuteNonQueryAsync();
                     }
 
-                    return new RepositoryResult<Guid>
+                    return new RepositoryResponse<Guid>
                     {
                         IsSuccess = true,
-                        StatusCode = Models.Enums.AuthorizationStatusCode.UserDeleted,
+                        StatusCode = StatusCode.Delete.Ok,
                         Message = "Користувача видалено!",
                         Data = userId
                     };
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResult<Guid>
+                    return new RepositoryResponse<Guid>
                     {
                         IsSuccess = false,
-                        StatusCode = Models.Enums.AuthorizationStatusCode.InternalServerError,
+                        StatusCode = StatusCode.General.InternalError,
                         Message = ex.Message
                     };
                 }
             }
         }
 
-        public async Task<RepositoryResult<UserEntity>> GetUserByIdAsync(Guid userId)
+        public async Task<RepositoryResponse<UserEntity>> GetUserByIdAsync(Guid userId)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -188,10 +187,10 @@ namespace Authorization.DAL.Repositories
                             {
                                 var userEntity = MapReaderToUser(readerInformationUser);
 
-                                return new RepositoryResult<UserEntity>()
+                                return new RepositoryResponse<UserEntity>()
                                 {
                                     IsSuccess = true,
-                                    StatusCode = Models.Enums.AuthorizationStatusCode.UserFound,
+                                    StatusCode = StatusCode.General.Ok,
                                     Message = "Користувача знайдено!",
                                     Data = userEntity
                                 };
@@ -199,19 +198,19 @@ namespace Authorization.DAL.Repositories
                         }
                     }
 
-                    return new RepositoryResult<UserEntity>()
+                    return new RepositoryResponse<UserEntity>()
                     {
                         IsSuccess = false,
-                        StatusCode = Models.Enums.AuthorizationStatusCode.UserNotFound,
+                        StatusCode = StatusCode.General.NotFound,
                         Message = "Користувача не знайдено!"
                     };
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResult<UserEntity>()
+                    return new RepositoryResponse<UserEntity>()
                     {
                         IsSuccess = false,
-                        StatusCode = Models.Enums.AuthorizationStatusCode.InternalServerError,
+                        StatusCode = StatusCode.General.InternalError,
                         Message = ex.Message
                     };
                 }

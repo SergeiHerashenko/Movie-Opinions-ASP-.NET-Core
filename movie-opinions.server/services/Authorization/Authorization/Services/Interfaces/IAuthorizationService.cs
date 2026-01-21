@@ -1,12 +1,12 @@
 ﻿using Authorization.Models.User;
-using Authorization.Models.Responses;
+using MovieOpinions.Contracts.Models.ServiceResponse;
 
 namespace Authorization.Services.Interfaces
 {
     public interface IAuthorizationService
     {
-        Task<AuthorizationResult> LoginAsync(UserLoginModel loginModel);
+        Task<ServiceResponse<AuthorizationUserDTO>> LoginAsync(UserLoginModel loginModel);
 
-        Task<AuthorizationResult> RegistrationAsync(UserRegisterModel registrationModel);
+        Task<ServiceResponse<AuthorizationUserDTO>> RegistrationAsync(UserRegisterModel registrationModel);
     }
 }

@@ -1,10 +1,12 @@
 ﻿using Authorization.DAL.Interface;
 using Authorization.Helpers;
-using Authorization.Models.Enums;
-using Authorization.Models.Responses;
+using MovieOpinions.Contracts.Enum;
+using MovieOpinions.Contracts.Models.ServiceResult;
 using Authorization.Models.User;
 using Authorization.Services.Interfaces;
 using Microsoft.IdentityModel.Tokens;
+using MovieOpinions.Contracts.Models.ServiceResponse;
+using MovieOpinions.Contracts.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -24,18 +26,18 @@ namespace Authorization.Services.Implementations
             _configuration = configuration;
         }
 
-        public async Task<AuthorizationResult> LoginAsync(UserLoginModel loginModel)
+        public async Task<ServiceResponse<AuthorizationUserDTO>> LoginAsync(UserLoginModel loginModel)
         {
             try
             {
                 var getUser = await _authorizationRepository.GetUserByEmailAsync(loginModel.Email);
 
-                if (getUser.StatusCode != AuthorizationStatusCode.UserFound)
+                if (getUser.StatusCode != StatusCode.General.Ok)
                 {
-                    return new AuthorizationResult()
+                    return new ServiceResponse<AuthorizationUserDTO>()
                     {
                         IsSuccess = false,
-                        Status = getUser.StatusCode,
+                        StatusCode = getUser.StatusCode,
                         Message = getUser.Message,
                     };
                 }
@@ -47,10 +49,10 @@ namespace Authorization.Services.Implementations
 
                 if (!isPasswordCorrect)
                 {
-                    return new AuthorizationResult()
+                    return new ServiceResponse<AuthorizationUserDTO>()
                     {
                         IsSuccess = false,
-                        Status = AuthorizationStatusCode.InvalidCredentials,
+                        StatusCode = StatusCode.Auth.Unauthorized,
                         Message = "Невірний логін або пароль!"
                     };
                 }
@@ -61,28 +63,28 @@ namespace Authorization.Services.Implementations
             }
             catch (Exception ex)
             {
-                return new AuthorizationResult
+                return new ServiceResponse<AuthorizationUserDTO>
                 {
                     IsSuccess = false,
-                    Status = AuthorizationStatusCode.InternalServerError,
+                    StatusCode = StatusCode.General.InternalError,
                     Message = ex.Message,
                 };
             }
         }
 
-        public async Task<AuthorizationResult> RegistrationAsync(UserRegisterModel registrationModel)
+        public async Task<ServiceResponse<AuthorizationUserDTO>> RegistrationAsync(UserRegisterModel registrationModel)
         {
             try
             {
                 // 1. Перевірка на існування
                 var getUser = await _authorizationRepository.GetUserByEmailAsync(registrationModel.Email);
 
-                if (getUser.StatusCode != AuthorizationStatusCode.UserNotFound)
+                if (getUser.StatusCode != StatusCode.General.NotFound)
                 {
-                    return new AuthorizationResult
+                    return new ServiceResponse<AuthorizationUserDTO>
                     {
                         IsSuccess = false,
-                        Status = getUser.StatusCode,
+                        StatusCode = getUser.StatusCode,
                         Message = getUser.Message,
                     };
                 }
@@ -104,15 +106,15 @@ namespace Authorization.Services.Implementations
                     IsDeleted = false,
                 };
 
-                // 3. Збереження в Auth базі
+                // 3. Збереження в Authorization базі
                 var registerUser = await _authorizationRepository.CreateUserAsync(newUser);
 
-                if (registerUser.StatusCode != AuthorizationStatusCode.UserCreated)
+                if (registerUser.StatusCode != StatusCode.Create.Created)
                 {
-                    return new AuthorizationResult
+                    return new ServiceResponse<AuthorizationUserDTO>
                     {
                         IsSuccess = false,
-                        Status = registerUser.StatusCode,
+                        StatusCode = registerUser.StatusCode,
                         Message = registerUser.Message,
                     };
                 }
@@ -124,27 +126,40 @@ namespace Authorization.Services.Implementations
                     Email = newUser.Email,
                 };
 
-                var response = await _httpClient.PostAsJsonAsync("api/profile", profileData);
-
-                if (!response.IsSuccessStatusCode)
+                try
                 {
-                    // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
+                    var response = await _httpClient.PostAsJsonAsync("api/profile", profileData);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
+                        await _authorizationRepository.DeleteUserAsync(newUser.UserId);
+
+                        var errorResponse = await response.Content.ReadFromJsonAsync<ServiceResult<Guid>>()
+                            ?? new ServiceResult<Guid> { Message = "Сервіс профілів повернув помилку", };
+
+                        return new ServiceResponse<AuthorizationUserDTO>
+                        {
+                            IsSuccess = false,
+                            StatusCode = (int)response.StatusCode,
+                            Message = errorResponse?.Message ?? "Сервіс профілів повернув помилку"
+                        };
+                    }
+                }
+                catch (HttpRequestException ex)
+                {
                     await _authorizationRepository.DeleteUserAsync(newUser.UserId);
 
-                    var errorResponse = await response.Content.ReadFromJsonAsync<ServiceResponse<Guid>>()
-                        ?? new ServiceResponse<Guid> { Message = "Сервіс профілів повернув помилку" };
-
-                    return new AuthorizationResult
+                    return new ServiceResponse<AuthorizationUserDTO>
                     {
                         IsSuccess = false,
-                        Status = AuthorizationStatusCode.InternalServerError,
-                        Message = errorResponse?.Message ?? "Сервіс профілів повернув помилку"
+                        StatusCode = StatusCode.General.InternalError,
+                        Message = "Сервіс профілів недоступний (Connection refused)"
                     };
                 }
 
                 // 5. HTTP виклик до NotificationService
                 // Доробити
-
 
                 var tokenModel = new UserTokenModel()
                 {
@@ -155,20 +170,27 @@ namespace Authorization.Services.Implementations
 
                 var token = GenerateJwtToken(tokenModel);
 
-                return new AuthorizationResult
+                var userDTO = new AuthorizationUserDTO()
+                {
+                    UserId = newUser.UserId,
+                    Token = token,
+                    // Додати інші поля (Поки не розумію)
+                };
+
+                return new ServiceResponse<AuthorizationUserDTO>
                 {
                     IsSuccess = true,
-                    Status = AuthorizationStatusCode.Success,
-                    Token = token,
+                    StatusCode = StatusCode.General.Ok,
+                    Data = userDTO,
                     Message = "Реєстрація успішна!"
                 };
             }
             catch (Exception ex)
             {
-                return new AuthorizationResult
+                return new ServiceResponse<AuthorizationUserDTO>
                 {
                     IsSuccess = false,
-                    Status = AuthorizationStatusCode.InternalServerError,
+                    StatusCode = StatusCode.General.InternalError,
                     Message = ex.Message,
                 };
             }
@@ -212,24 +234,24 @@ namespace Authorization.Services.Implementations
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        private AuthorizationResult CheckUserAccess(UserEntity userResponse)
+        private ServiceResponse<AuthorizationUserDTO> CheckUserAccess(UserEntity userResponse)
         {
             if (userResponse.IsBlocked)
             {
-                return new AuthorizationResult()
+                return new ServiceResponse<AuthorizationUserDTO>()
                 {
                     IsSuccess = false,
-                    Status = AuthorizationStatusCode.UserLockedOut,
+                    StatusCode = MovieOpinions.Contracts.Models.StatusCode.Auth.Locked,
                     Message = "Користувача заблоковано!"
                 };
             }
 
             if (userResponse.IsDeleted)
             {
-                return new AuthorizationResult()
+                return new ServiceResponse<AuthorizationUserDTO>()
                 {
                     IsSuccess = false,
-                    Status = AuthorizationStatusCode.UserDeleted,
+                    StatusCode = MovieOpinions.Contracts.Models.StatusCode.General.NotFound,
                     Message = "Користувач видалений!"
                 };
             }
@@ -243,11 +265,18 @@ namespace Authorization.Services.Implementations
 
             var token = GenerateJwtToken(generateJWL);
 
-            return new AuthorizationResult()
+            var userDTO = new AuthorizationUserDTO()
+            {
+                UserId = userResponse.UserId,
+                Token = token,
+                // Додати інші поля (Поки не розумію)
+            };
+
+            return new ServiceResponse<AuthorizationUserDTO>()
             {
                 IsSuccess = true,
-                Status = AuthorizationStatusCode.Success,
-                Token = token
+                StatusCode = MovieOpinions.Contracts.Models.StatusCode.General.Ok,
+                Data = userDTO
             };
         }
     }

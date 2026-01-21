@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Notification.Models.Notification;
 using Notification.Services.Interfaces;
 
 namespace Notification.Controllers
@@ -15,9 +16,10 @@ namespace Notification.Controllers
         }
 
         [HttpPost("notification")]
-        public async Task<IActionResult> Send()
+        public async Task<IActionResult> SendAsync(NotificationRequest notification)
         {
-            return View();
+            var sendResult = await _notificationService.SendAsync(notification);
+            return Ok(sendResult);
         }
     }
 }

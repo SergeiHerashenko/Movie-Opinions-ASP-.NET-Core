@@ -1,4 +1,4 @@
-﻿using Authorization.Models.Enums;
+﻿using MovieOpinions.Contracts.Enum;
 
 namespace Authorization.Models.User
 {

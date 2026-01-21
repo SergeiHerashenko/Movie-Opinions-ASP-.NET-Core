@@ -1,5 +1,9 @@
+using Notification.DAL.Interface;
+using Notification.DAL.Repositories;
 using Notification.Services.Implementations;
 using Notification.Services.Interfaces;
+using Notification.Services.Senders;
+using System.Text.Json.Serialization;
 
 internal class Program
 {
@@ -9,9 +13,16 @@ internal class Program
 
         // Add services to the container.
         builder.Services.AddScoped<INotificationService, NotificationService>();
+        builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+        builder.Services.AddScoped<ISender, EmailSender>();
+        builder.Services.AddScoped<ISender, SmsSender>();
 
-        builder.Services.AddControllers();
-        // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+        builder.Services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            });
+
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
 

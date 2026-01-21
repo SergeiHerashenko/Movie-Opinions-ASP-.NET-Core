@@ -1,6 +1,7 @@
-﻿using Profile.DAL.Interface;
+﻿using MovieOpinions.Contracts.Models.ServiceResponse;
+using MovieOpinions.Contracts.Models;
+using Profile.DAL.Interface;
 using Profile.Models.Profile;
-using Profile.Models.Responses;
 using Profile.Services.Interfaces;
 
 namespace Profile.Services.Implementations
@@ -14,7 +15,7 @@ namespace Profile.Services.Implementations
             _profileRepository = profileRepository;
         }
 
-        public async Task<ProfileResult<Guid>> CreateProfileAsync(CreateUserProfileDTO model)
+        public async Task<ServiceResponse<Guid>> CreateProfileAsync(CreateUserProfileDTO model)
         {
             try
             {
@@ -33,18 +34,18 @@ namespace Profile.Services.Implementations
 
                 var createUserProfile = await _profileRepository.CreateUserAsync(newUser);
 
-                if (createUserProfile.StatusCode == Models.Enums.ProfileStatusCode.ProfileCreated)
+                if (createUserProfile.StatusCode == StatusCode.Create.Created)
                 {
-                    return new ProfileResult<Guid>
+                    return new ServiceResponse<Guid>
                     {
                         IsSuccess = true,
-                        StatusCode = Models.Enums.ProfileStatusCode.ProfileCreated,
+                        StatusCode = StatusCode.Create.Created,
                         Message = "Користувача створенно!",
                         Data = model.UserId
                     };
                 }
 
-                return new ProfileResult<Guid>
+                return new ServiceResponse<Guid>
                 {
                     IsSuccess = false,
                     StatusCode = createUserProfile.StatusCode,
@@ -54,32 +55,32 @@ namespace Profile.Services.Implementations
             }
             catch (Exception ex)
             {
-                return new ProfileResult<Guid>
+                return new ServiceResponse<Guid>
                 {
                     IsSuccess = false,
-                    StatusCode = Models.Enums.ProfileStatusCode.ProfileInternalError,
+                    StatusCode = StatusCode.General.InternalError,
                     Message = ex.Message,
                     Data = model.UserId
                 };
             }
         }
 
-        public async Task<ProfileResult<bool>> DeleteProfileAsync(Guid userId)
+        public async Task<ServiceResponse<bool>> DeleteProfileAsync(Guid userId)
         {
             throw new NotImplementedException();
         }
 
-        public async Task<ProfileResult<UserProfileDTO>> GetUserByIdAsync(Guid userId)
+        public async Task<ServiceResponse<UserProfileDTO>> GetUserByIdAsync(Guid userId)
         {
             throw new NotImplementedException();
         }
 
-        public async Task<ProfileResult<List<UserSearchDTO>>> SearchUsersByNameAsync(string name)
+        public async Task<ServiceResponse<List<UserSearchDTO>>> SearchUsersByNameAsync(string name)
         {
             throw new NotImplementedException();
         }
 
-        public async Task<ProfileResult<UserProfileDTO>> UpdateProfileAsync(Guid userId, UpdateProfileDTO model)
+        public async Task<ServiceResponse<UserProfileDTO>> UpdateProfileAsync(Guid userId, UpdateProfileDTO model)
         {
             throw new NotImplementedException();
         }

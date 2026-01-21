@@ -1,16 +1,16 @@
-﻿using Authorization.Models.Responses;
-using Authorization.Models.User;
+﻿using Authorization.Models.User;
+using MovieOpinions.Contracts.Models.RepositoryResponse;
 
 namespace Authorization.DAL.Interface
 {
     public interface IAuthorizationRepository
     {
-        Task<RepositoryResult<UserEntityDTO>> CreateUserAsync(UserEntity userEntity);
+        Task<RepositoryResponse<UserEntityDTO>> CreateUserAsync(UserEntity userEntity);
 
-        Task<RepositoryResult<Guid>> DeleteUserAsync(Guid userId);
+        Task<RepositoryResponse<Guid>> DeleteUserAsync(Guid userId);
 
-        Task<RepositoryResult<UserEntity>> GetUserByEmailAsync(string email);
+        Task<RepositoryResponse<UserEntity>> GetUserByEmailAsync(string email);
 
-        Task<RepositoryResult<UserEntity>> GetUserByIdAsync(Guid userId);
+        Task<RepositoryResponse<UserEntity>> GetUserByIdAsync(Guid userId);
     }
 }
