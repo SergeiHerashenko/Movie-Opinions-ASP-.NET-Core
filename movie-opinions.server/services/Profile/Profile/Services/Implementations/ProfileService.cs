@@ -32,7 +32,7 @@ namespace Profile.Services.Implementations
                     LastUpdatedAt = null
                 };
 
-                var createUserProfile = await _profileRepository.CreateUserAsync(newUser);
+                var createUserProfile = await _profileRepository.CreateAsync(newUser);
 
                 if (createUserProfile.StatusCode == StatusCode.Create.Created)
                 {

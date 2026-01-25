@@ -8,6 +8,6 @@ namespace Notification.Services.Interfaces
     {
         NotificationChannel Channel { get; }
 
-        Task<SenderResponses> SendAsync (string destination, NotificationMessage message);
+        Task<SenderResponses> SendAsync (string destination, NotificationContent message);
     }
 }

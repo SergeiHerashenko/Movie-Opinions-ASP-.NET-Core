@@ -16,19 +16,27 @@ internal class Program
 
         // Add services to the container.
         var profileServiceUrl = builder.Configuration["ServiceUrls:ProfileService"];
-        if (string.IsNullOrEmpty(profileServiceUrl))
+        var notificationServiceUrl = builder.Configuration["ServiceUrls:NotificationService"];
+        if (string.IsNullOrEmpty(profileServiceUrl) || string.IsNullOrEmpty(notificationServiceUrl))
         {
-            throw new Exception("Критична помилка: Не знайдено URL для ProfileService у конфігурації!");
+            throw new Exception("Критична помилка: Не знайдено URL сервісів у конфігурації!");
         }
+
+        // Клієнт для профілів
+        builder.Services.AddHttpClient("ProfileClient", client =>
+        {
+            client.BaseAddress = new Uri(profileServiceUrl);
+        });
+
+        // Клієнт для сповіщень
+        builder.Services.AddHttpClient("NotificationClient", client =>
+        {
+            client.BaseAddress = new Uri(notificationServiceUrl);
+        });
 
         builder.Services.AddSingleton<IConnectAuthorizationDb, ConnectAuthorizationDb>();
         builder.Services.AddScoped<IAuthorizationRepository, AuthorizationRepository>();
-
-        builder.Services.AddHttpClient<IAuthorizationService, AuthorizationService>(client =>
-        {
-            client.BaseAddress = new Uri(profileServiceUrl);
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        });
+        builder.Services.AddScoped<IAuthorizationService, AuthorizationService>();
 
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();

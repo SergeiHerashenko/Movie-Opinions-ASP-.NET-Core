@@ -14,10 +14,10 @@ namespace Template.Controllers
             _templateService = templateService;
         }
 
-        [HttpGet("templates")]
-        public async Task<IActionResult> Index(string templateName)
+        [HttpGet("templates/{nameTemplate}")]
+        public async Task<IActionResult> GetTemplate(string nameTemplate)
         {
-            var getTemplate = await _templateService.GetTemplateText(templateName);
+            var getTemplate = await _templateService.GetTemplateText(nameTemplate);
 
             return Ok(getTemplate);
         }

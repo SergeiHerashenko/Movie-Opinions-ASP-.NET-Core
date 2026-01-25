@@ -7,11 +7,10 @@ namespace Notification.Models.Notification
         public Guid Id { get; set; }
 
         public string Destination { get; set; }
+
         public NotificationChannel Channel { get; set; }
 
-        public string Title { get; set; }
-        public string Body { get; set; }
-        public string Footer { get; set; }
+        public string NameTemplate { get; set; }
 
         public NotificationStatus Status { get; set; }
 

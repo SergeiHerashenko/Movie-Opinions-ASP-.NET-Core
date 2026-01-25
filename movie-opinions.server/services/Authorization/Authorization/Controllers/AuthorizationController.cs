@@ -18,11 +18,21 @@ namespace Authorization.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] UserRegisterModel model)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            try
+            {
+                var result = await _authorizationService.RegistrationAsync(model);
 
-            var result = await _authorizationService.RegistrationAsync(model);
-            return Ok(result);
+                if (!result.IsSuccess)
+                {
+                    return BadRequest(result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "An internal error occurred during registration.");
+            }
         }
 
         [HttpPost("login")]

@@ -9,7 +9,7 @@ namespace Notification.Services.Senders
     {
         public NotificationChannel Channel => NotificationChannel.SMS;
 
-        public async Task<SenderResponses> SendAsync(string destination, NotificationMessage message)
+        public async Task<SenderResponses> SendAsync(string destination, NotificationContent message)
         {
             return new SenderResponses
             {

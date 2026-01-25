@@ -1,16 +1,11 @@
-﻿using MovieOpinions.Contracts.Models.RepositoryResponse;
+﻿using MovieOpinions.Contracts.Models.Interface;
+using MovieOpinions.Contracts.Models.RepositoryResponse;
 using Verification.Models;
 
 namespace Verification.DAL.Interface
 {
-    public interface IVerificationRepositories
+    public interface IVerificationRepositories : IBaseRepository<VerificationEntity, RepositoryResponse<VerificationEntity>>
     {
-        Task<RepositoryResponse<Guid>> Create(VerificationEntity verificationEntity);
-
-        Task<RepositoryResponse<Guid>> Update(VerificationEntity verificationEntity);
-
-        Task<RepositoryResponse<Guid>> Delete(Guid id);
-
         Task<RepositoryResponse<Guid>> Get(Guid id);
     }
 }

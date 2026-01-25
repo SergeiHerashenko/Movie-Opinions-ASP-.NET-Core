@@ -8,6 +8,11 @@
 
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="XAct.Core.PCL" Version="0.0.5014" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\contracts\MovieOpinions.Contracts\MovieOpinions.Contracts\MovieOpinions.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

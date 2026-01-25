@@ -1,4 +1,5 @@
-﻿using MovieOpinions.Contracts.Models;
+﻿using MovieOpinions.Contracts.Enum;
+using MovieOpinions.Contracts.Models;
 using MovieOpinions.Contracts.Models.RepositoryResponse;
 using Npgsql;
 using Profile.DAL.Connect_Database;
@@ -16,7 +17,7 @@ namespace Profile.DAL.Repositories
             _connectProfileDb = connectProfileDb;
         }
 
-        public async Task<RepositoryResponse<Guid>> CreateUserAsync(UserProfile profileUser)
+        public async Task<RepositoryResponse<UserProfile>> CreateAsync(UserProfile entity)
         {
             using (var conn = new NpgsqlConnection(_connectProfileDb.GetConnectProfileDataBase()))
             {
@@ -29,40 +30,44 @@ namespace Profile.DAL.Repositories
                             "Users_Profile_Table (id_user, user_name, first_name, last_name, phone_number, bio, avatar_url, created_at, last_updated_at) " +
                         "VALUES (@Id, @Name, @FirstName, @LastName, @PhoneNumber, @Bio, @AvatarUrl, NOW(), @LastUpdatedAt);", conn))
                     {
-                        createUser.Parameters.AddWithValue("@Id", profileUser.UserId);
-                        createUser.Parameters.AddWithValue("@Name", profileUser.UserName);
-                        createUser.Parameters.AddWithValue("@FirstName", profileUser.FirstName ?? (object)DBNull.Value);
-                        createUser.Parameters.AddWithValue("@LastName", profileUser.LastName ?? (object)DBNull.Value);
-                        createUser.Parameters.AddWithValue("@PhoneNumber", profileUser.PhoneNumber ?? (object)DBNull.Value);
-                        createUser.Parameters.AddWithValue("@Bio", profileUser.Bio ?? (object)DBNull.Value);
-                        createUser.Parameters.AddWithValue("@AvatarUrl", profileUser.AvatarUrl ?? (object)DBNull.Value);
-                        createUser.Parameters.AddWithValue("@LastUpdatedAt", profileUser.LastUpdatedAt ?? (object)DBNull.Value);
+                        createUser.Parameters.AddWithValue("@Id", entity.UserId);
+                        createUser.Parameters.AddWithValue("@Name", entity.UserName);
+                        createUser.Parameters.AddWithValue("@FirstName", entity.FirstName ?? (object)DBNull.Value);
+                        createUser.Parameters.AddWithValue("@LastName", entity.LastName ?? (object)DBNull.Value);
+                        createUser.Parameters.AddWithValue("@PhoneNumber", entity.PhoneNumber ?? (object)DBNull.Value);
+                        createUser.Parameters.AddWithValue("@Bio", entity.Bio ?? (object)DBNull.Value);
+                        createUser.Parameters.AddWithValue("@AvatarUrl", entity.AvatarUrl ?? (object)DBNull.Value);
+                        createUser.Parameters.AddWithValue("@LastUpdatedAt", entity.LastUpdatedAt ?? (object)DBNull.Value);
 
                         await createUser.ExecuteNonQueryAsync();
                     }
 
-                    return new RepositoryResponse<Guid>
+                    return new RepositoryResponse<UserProfile>
                     {
                         IsSuccess = true,
                         StatusCode = StatusCode.Create.Created,
                         Message = "Користувач створений!",
-                        Data = profileUser.UserId
+                        Data = entity
                     };
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResponse<Guid>
+                    return new RepositoryResponse<UserProfile>
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.InternalError,
-                        Message = ex.Message,
-                        Data = profileUser.UserId
+                        Message = "Помилка в базі даних!" + ex.Message
                     };
                 }
             }
         }
 
-        public async Task<RepositoryResponse<Guid>> DeleteUserAsync(Guid userId)
+        public async Task<RepositoryResponse<UserProfile>> UpdateAsync(UserProfile entity)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task<RepositoryResponse<UserProfile>> DeleteAsync(Guid id)
         {
             await using (var conn = new NpgsqlConnection(_connectProfileDb.GetConnectProfileDataBase()))
             {
@@ -73,47 +78,70 @@ namespace Profile.DAL.Repositories
                     await using (var deleteUser = new NpgsqlCommand(
                         "DELETE FROM " +
                             "Users_Profile_Table " +
-                        "WHERE id_user = @ID", conn))
+                        "WHERE id_user = @ID RETURNING *", conn))
                     {
-                        deleteUser.Parameters.AddWithValue("@ID", userId);
+                        deleteUser.Parameters.AddWithValue("@ID", id);
 
-                        await deleteUser.ExecuteNonQueryAsync();
+                        await using (var readerInformationUser = await deleteUser.ExecuteReaderAsync())
+                        {
+                            if (await readerInformationUser.ReadAsync())
+                            {
+                                var userEntity = MapReaderToUser(readerInformationUser);
+
+                                return new RepositoryResponse<UserProfile>()
+                                {
+                                    IsSuccess = true,
+                                    StatusCode = StatusCode.General.Ok,
+                                    Message = "Користувача видалено!",
+                                    Data = userEntity
+                                };
+                            }
+                        }
                     }
 
-                    return new RepositoryResponse<Guid>
+                    return new RepositoryResponse<UserProfile>
                     {
                         IsSuccess = true,
                         StatusCode = StatusCode.Delete.Ok,
-                        Message = "Користувача видалено!",
-                        Data = userId
+                        Message = "Користувача видалено!"
                     };
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResponse<Guid>
+                    return new RepositoryResponse<UserProfile>
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.InternalError,
-                        Message = ex.Message,
-                        Data = userId
+                        Message = "Помилка в базі даних!" + ex.Message
                     };
                 }
             }
         }
 
-        public async Task<RepositoryResponse<List<UserSearchDTO>>> GetSearchUsersByNameAsync(string searchName)
+        public async Task<RepositoryResponse<List<UserProfile>>> GetSearchUsersByNameAsync(string searchName)
         {
             throw new NotImplementedException();
         }
 
-        public async Task<RepositoryResponse<UserProfileDTO>> GetUserById(Guid userId)
+        public async Task<RepositoryResponse<UserProfile>> GetUserById(Guid userId)
         {
             throw new NotImplementedException();
         }
 
-        public async Task<RepositoryResponse<UserProfileDTO>> UpdateUserAsync(Guid userId)
+        private UserProfile MapReaderToUser(NpgsqlDataReader reader)
         {
-            throw new NotImplementedException();
+            return new UserProfile()
+            {
+                UserId = Guid.Parse(reader["id_user"].ToString()),
+                UserName = reader["user_name"].ToString(),
+                FirstName = reader["first_name"].ToString(),
+                LastName = reader["last_name"].ToString(),
+                PhoneNumber = reader["phone_number"].ToString(),
+                Bio = reader["bio"].ToString(),
+                AvatarUrl = reader["avatar_url"].ToString(),
+                CreatedAt = Convert.ToDateTime(reader["created_at"]),
+                LastUpdatedAt = Convert.ToDateTime(reader["last_updated_at"]),
+            };
         }
     }
 }

@@ -12,6 +12,26 @@ internal class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
+        var templateServiceUrl = builder.Configuration["ServiceUrls:TemplateService"];
+        var verificationServiceUrl = builder.Configuration["ServiceUrls:VerificationService"];
+
+        if (string.IsNullOrEmpty(templateServiceUrl) || string.IsNullOrEmpty(verificationServiceUrl))
+        {
+            throw new Exception("Критична помилка: Не знайдено URL сервісів у конфігурації!");
+        }
+
+        // Клієнт для шаблонів
+        builder.Services.AddHttpClient("TemplateClient", client =>
+        {
+            client.BaseAddress = new Uri(templateServiceUrl);
+        });
+
+        // Клієнт для верифікації
+        builder.Services.AddHttpClient("VerificationClient", client =>
+        {
+            client.BaseAddress = new Uri(verificationServiceUrl);
+        });
+
         builder.Services.AddScoped<INotificationService, NotificationService>();
         builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
         builder.Services.AddScoped<ISender, EmailSender>();

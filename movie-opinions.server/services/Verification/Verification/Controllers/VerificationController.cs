@@ -14,11 +14,18 @@ namespace Verification.Controllers
             _verificationService = verificationService;
         }
 
-        [HttpPost("verification")]
-        public async Task<IActionResult> GenerateToken()
+        [HttpPost("token")]
+        public async Task<IActionResult> GenerateToken([FromBody] Guid userId)
         {
-            var getToken = await _verificationService.GenerateVerificationToken();
+            var getToken = await _verificationService.GenerateVerificationToken(userId);
             return Ok(getToken);
+        }
+
+        [HttpPost("code")]
+        public async Task<IActionResult> GenerateCode()
+        {
+            var getCode = await _verificationService.GenerateVerificationCode();
+            return Ok(getCode);
         }
     }
 }

@@ -17,12 +17,12 @@ namespace Template.DAL.Repositories
             _connectTemplateDb = connectTemplateDb;
         }
 
-        public Task<RepositoryResponse<TemplateEntity>> CreateTemplate(TemplateEntity templateEntity)
+        public Task<RepositoryResponse<TemplateEntity>> CreateAsync(TemplateEntity entity)
         {
             throw new NotImplementedException();
         }
 
-        public Task<RepositoryResponse<TemplateEntity>> DeleteTemplate(string templateId)
+        public Task<RepositoryResponse<TemplateEntity>> DeleteAsync(Guid id)
         {
             throw new NotImplementedException();
         }
@@ -88,7 +88,7 @@ namespace Template.DAL.Repositories
             }
         }
 
-        public Task<RepositoryResponse<TemplateEntity>> UpdateTemplate(string templateId)
+        public Task<RepositoryResponse<TemplateEntity>> UpdateAsync(TemplateEntity entity)
         {
             throw new NotImplementedException();
         }

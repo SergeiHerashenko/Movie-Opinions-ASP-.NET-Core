@@ -15,7 +15,7 @@ namespace Profile.Controllers
             _profileService = profileService;
         }
 
-        [HttpPost]
+        [HttpPost("create")]
         public async Task<IActionResult> CreateProfile([FromBody] CreateUserProfileDTO model)
         {
             var resultCreate = await _profileService.CreateProfileAsync(model);

@@ -26,6 +26,7 @@ namespace Template.Services.Implementations
             {
                 return new ServiceResponse<TemplateEntity>()
                 {
+                    IsSuccess = false,
                     StatusCode = getTemplate.StatusCode,
                     Message = getTemplate.Message
                 };
@@ -50,6 +51,7 @@ namespace Template.Services.Implementations
                         {
                             return new ServiceResponse<TemplateEntity>()
                             {
+                                IsSuccess = false,
                                 StatusCode = StatusCode.General.NotFound,
                                 Message = $"Файл шаблону не знайдено за шляхом: {fullPath}"
                             };
@@ -61,6 +63,7 @@ namespace Template.Services.Implementations
                     default:
                         return new ServiceResponse<TemplateEntity>()
                         {
+                            IsSuccess = false,
                             StatusCode = StatusCode.General.InternalError,
                             Message = "Невідомий тип джерела шаблону."
                         };
@@ -70,6 +73,7 @@ namespace Template.Services.Implementations
             {
                 return new ServiceResponse<TemplateEntity>()
                 {
+                    IsSuccess = false,
                     StatusCode = StatusCode.General.InternalError,
                     Message = ex.Message
                 };
@@ -79,6 +83,7 @@ namespace Template.Services.Implementations
 
             return new ServiceResponse<TemplateEntity>()
             {
+                IsSuccess = true,
                 StatusCode = StatusCode.General.Ok,
                 Message = "Шаблон знайдено!",
                 Data = getTemplate.Data

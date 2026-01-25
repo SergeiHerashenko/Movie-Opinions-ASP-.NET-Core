@@ -1,12 +1,12 @@
 ﻿using Authorization.DAL.Interface;
 using Authorization.Helpers;
-using MovieOpinions.Contracts.Enum;
-using MovieOpinions.Contracts.Models.ServiceResult;
 using Authorization.Models.User;
 using Authorization.Services.Interfaces;
 using Microsoft.IdentityModel.Tokens;
-using MovieOpinions.Contracts.Models.ServiceResponse;
+using MovieOpinions.Contracts.Enum;
 using MovieOpinions.Contracts.Models;
+using MovieOpinions.Contracts.Models.ServiceResponse;
+using MovieOpinions.Contracts.Models.ServiceResult;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -16,13 +16,13 @@ namespace Authorization.Services.Implementations
     public class AuthorizationService : IAuthorizationService
     {
         private readonly IAuthorizationRepository _authorizationRepository;
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly IConfiguration _configuration;
 
-        public AuthorizationService(IAuthorizationRepository authorizationRepository, HttpClient httpClient, IConfiguration configuration)
+        public AuthorizationService(IAuthorizationRepository authorizationRepository, IHttpClientFactory httpClient, IConfiguration configuration)
         {
             _authorizationRepository = authorizationRepository;
-            _httpClient = httpClient;
+            _httpClientFactory = httpClient;
             _configuration = configuration;
         }
 
@@ -90,24 +90,10 @@ namespace Authorization.Services.Implementations
                 }
 
                 // 2. Створення сутності
-                string passwordSalt = Guid.NewGuid().ToString();
-                string encryptionPassword = await new HashPassword().GetHashedPasswordAsync(registrationModel.Password, passwordSalt);
-
-                var newUser = new UserEntity()
-                {
-                    UserId = Guid.NewGuid(),
-                    Email = registrationModel.Email,
-                    PasswordHash = encryptionPassword,
-                    PasswordSalt = passwordSalt,
-                    Role = Role.User,
-                    CreatedAt = DateTime.UtcNow,
-                    IsEmailConfirmed = false,
-                    IsBlocked = false,
-                    IsDeleted = false,
-                };
+                var newUser = await CreateNewUserEntityAsync(registrationModel);
 
                 // 3. Збереження в Authorization базі
-                var registerUser = await _authorizationRepository.CreateUserAsync(newUser);
+                var registerUser = await _authorizationRepository.CreateAsync(newUser);
 
                 if (registerUser.StatusCode != StatusCode.Create.Created)
                 {
@@ -119,47 +105,52 @@ namespace Authorization.Services.Implementations
                     };
                 }
 
-                // 4. HTTP виклик до ProfileService
-                var profileData = new
+                // 4. Створюємо опис запиту на ProfileService
+                var profileRequest = new InternalRequest<object>
                 {
-                    UserId = newUser.UserId,
-                    Email = newUser.Email,
+                    ClientName = "ProfileClient",
+                    Endpoint = "api/profile/create",
+                    Method = HttpMethod.Post,
+                    Body = new { UserId = newUser.UserId, Email = newUser.Email }
                 };
 
-                try
+                var responseProfile = await SendInternalRequest<object, Guid>(profileRequest);
+
+                if (!responseProfile.IsSuccess)
                 {
-                    var response = await _httpClient.PostAsJsonAsync("api/profile", profileData);
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
-                        await _authorizationRepository.DeleteUserAsync(newUser.UserId);
-
-                        var errorResponse = await response.Content.ReadFromJsonAsync<ServiceResult<Guid>>()
-                            ?? new ServiceResult<Guid> { Message = "Сервіс профілів повернув помилку", };
-
-                        return new ServiceResponse<AuthorizationUserDTO>
-                        {
-                            IsSuccess = false,
-                            StatusCode = (int)response.StatusCode,
-                            Message = errorResponse?.Message ?? "Сервіс профілів повернув помилку"
-                        };
-                    }
-                }
-                catch (HttpRequestException ex)
-                {
-                    await _authorizationRepository.DeleteUserAsync(newUser.UserId);
-
+                    // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
+                    await _authorizationRepository.DeleteAsync(newUser.UserId);
+                    
                     return new ServiceResponse<AuthorizationUserDTO>
                     {
                         IsSuccess = false,
-                        StatusCode = StatusCode.General.InternalError,
-                        Message = "Сервіс профілів недоступний (Connection refused)"
+                        StatusCode = (int)responseProfile.StatusCode,
+                        Message = responseProfile?.Message ?? "Сервіс профілів повернув помилку"
                     };
                 }
 
                 // 5. HTTP виклик до NotificationService
-                // Доробити
+                var notificationRequest = new InternalRequest<object>
+                {
+                    ClientName = "NotificationClient",
+                    Endpoint = "api/notification/send",
+                    Method = HttpMethod.Post,
+                    Body = new
+                        {
+                            IdUser = newUser.UserId,
+                            Destination = newUser.Email,
+                            Channel = "Email",
+                            TemplateName = "Registration",
+                            TemplateData = new Dictionary<string, string>
+                            {
+                                // Поки не всі поля!
+                                { "UserName", newUser.Email },
+                                { "AppName", "Movie Opinions" }
+                            }
+                        }
+                };
+
+                var responseNotification = await SendInternalRequest<object, object>(notificationRequest);
 
                 var tokenModel = new UserTokenModel()
                 {
@@ -241,7 +232,7 @@ namespace Authorization.Services.Implementations
                 return new ServiceResponse<AuthorizationUserDTO>()
                 {
                     IsSuccess = false,
-                    StatusCode = MovieOpinions.Contracts.Models.StatusCode.Auth.Locked,
+                    StatusCode = StatusCode.Auth.Locked,
                     Message = "Користувача заблоковано!"
                 };
             }
@@ -251,7 +242,7 @@ namespace Authorization.Services.Implementations
                 return new ServiceResponse<AuthorizationUserDTO>()
                 {
                     IsSuccess = false,
-                    StatusCode = MovieOpinions.Contracts.Models.StatusCode.General.NotFound,
+                    StatusCode = StatusCode.General.NotFound,
                     Message = "Користувач видалений!"
                 };
             }
@@ -275,9 +266,76 @@ namespace Authorization.Services.Implementations
             return new ServiceResponse<AuthorizationUserDTO>()
             {
                 IsSuccess = true,
-                StatusCode = MovieOpinions.Contracts.Models.StatusCode.General.Ok,
+                StatusCode = StatusCode.General.Ok,
                 Data = userDTO
             };
+        }
+
+        private async Task<UserEntity> CreateNewUserEntityAsync(UserRegisterModel registrationModel)
+        {
+            string passwordSalt = Guid.NewGuid().ToString();
+            string encryptionPassword = await new HashPassword().GetHashedPasswordAsync(registrationModel.Password, passwordSalt);
+
+            return new UserEntity()
+            {
+                UserId = Guid.NewGuid(),
+                Email = registrationModel.Email,
+                PasswordHash = encryptionPassword,
+                PasswordSalt = passwordSalt,
+                Role = Role.User,
+                CreatedAt = DateTime.UtcNow,
+                IsEmailConfirmed = false,
+                IsBlocked = false,
+                IsDeleted = false,
+            };
+        }
+
+        private async Task<ServiceResponse<TResponse>> SendInternalRequest<TBody, TResponse>(InternalRequest<TBody> internalReques)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient(internalReques.ClientName);
+                HttpResponseMessage response;
+
+                if (internalReques.Method == HttpMethod.Post)
+                {
+                    response = await client.PostAsJsonAsync(internalReques.Endpoint, internalReques.Body);
+                }
+                else
+                {
+                    response = await client.GetAsync(internalReques.Endpoint);
+                }
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<TResponse>();
+
+                    return new ServiceResponse<TResponse>
+                    {
+                        IsSuccess = true,
+                        Data = result,
+                        StatusCode = (int)response.StatusCode
+                    };
+                }
+
+                var errorData = await response.Content.ReadFromJsonAsync<ServiceResult<object>>();
+
+                return new ServiceResponse<TResponse>
+                {
+                    IsSuccess = false,
+                    Message = errorData?.Message ?? response.ReasonPhrase,
+                    StatusCode = (int)response.StatusCode
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ServiceResponse<TResponse>
+                {
+                    IsSuccess = false,
+                    Message = $"Критична помилка: {ex.Message}",
+                    StatusCode = 500
+                };
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using MovieOpinions.Contracts.Models.RepositoryResponse;
+﻿using MovieOpinions.Contracts.Models;
+using MovieOpinions.Contracts.Models.RepositoryResponse;
 using Verification.DAL.Interface;
 using Verification.Models;
 
@@ -6,12 +7,12 @@ namespace Verification.DAL.Repositories
 {
     public class VerificationRepositories : IVerificationRepositories
     {
-        public Task<RepositoryResponse<Guid>> Create(VerificationEntity verificationEntity)
+        public Task<RepositoryResponse<VerificationEntity>> CreateAsync(VerificationEntity entity)
         {
             throw new NotImplementedException();
         }
 
-        public Task<RepositoryResponse<Guid>> Delete(Guid id)
+        public Task<RepositoryResponse<VerificationEntity>> DeleteAsync(Guid id)
         {
             throw new NotImplementedException();
         }
@@ -21,7 +22,7 @@ namespace Verification.DAL.Repositories
             throw new NotImplementedException();
         }
 
-        public Task<RepositoryResponse<Guid>> Update(VerificationEntity verificationEntity)
+        public Task<RepositoryResponse<VerificationEntity>> UpdateAsync(VerificationEntity entity)
         {
             throw new NotImplementedException();
         }

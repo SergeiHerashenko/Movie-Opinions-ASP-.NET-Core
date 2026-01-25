@@ -5,7 +5,9 @@ namespace Verification.Services.Interfaces
 {
     public interface IVerificationService
     {
-        Task<ServiceResponse<VerificationEntity>> GenerateVerificationToken();
+        Task<ServiceResponse<string>> GenerateVerificationToken(Guid userId);
+
+        Task<ServiceResponse<VerificationEntity>> GenerateVerificationCode();
 
         Task<ServiceResponse<Guid>> ConfirmVerification();
     }

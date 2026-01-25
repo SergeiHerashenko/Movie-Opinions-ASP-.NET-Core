@@ -2,5 +2,7 @@
 {
     public enum VerificationType
     {
+        URL = 0,
+        Code = 1,
     }
 }

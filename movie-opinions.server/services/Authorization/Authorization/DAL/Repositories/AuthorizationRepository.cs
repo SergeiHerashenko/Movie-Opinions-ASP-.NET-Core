@@ -1,10 +1,11 @@
 ﻿using Authorization.DAL.Connect_Database;
 using Authorization.DAL.Interface;
-using MovieOpinions.Contracts.Enum;
 using Authorization.Models.User;
-using MovieOpinions.Contracts.Models.RepositoryResponse;
+using MovieOpinions.Contracts.Enum;
 using MovieOpinions.Contracts.Models;
+using MovieOpinions.Contracts.Models.RepositoryResponse;
 using Npgsql;
+using XAct.Users;
 
 namespace Authorization.DAL.Repositories
 {
@@ -17,7 +18,7 @@ namespace Authorization.DAL.Repositories
             _connectAuthorizationhDb = connectAuthorizationDb;
         }
 
-        public async Task<RepositoryResponse<UserEntityDTO>> CreateUserAsync(UserEntity userEntity)
+        public async Task<RepositoryResponse<UserEntity>> CreateAsync(UserEntity entity)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -29,28 +30,23 @@ namespace Authorization.DAL.Repositories
                     {
                         try
                         {
-                            await InsertUserTableAsync(conn, transaction, userEntity);
+                            await InsertUserTableAsync(conn, transaction, entity);
 
                             await transaction.CommitAsync();
 
-                            return new RepositoryResponse<UserEntityDTO>()
+                            return new RepositoryResponse<UserEntity>()
                             {
                                 IsSuccess = true,
                                 StatusCode = StatusCode.Create.Created,
                                 Message = "Користувача створено!",
-                                Data = new UserEntityDTO()
-                                {
-                                    UserId = userEntity.UserId,
-                                    Email = userEntity.Email,
-                                    IsEmailConfirmed = userEntity.IsEmailConfirmed
-                                },
+                                Data = entity
                             };
                         }
                         catch (Exception ex)
                         {
                             await transaction.RollbackAsync();
 
-                            return new RepositoryResponse<UserEntityDTO>()
+                            return new RepositoryResponse<UserEntity>()
                             {
                                 IsSuccess = false,
                                 StatusCode = StatusCode.General.InternalError,
@@ -61,7 +57,63 @@ namespace Authorization.DAL.Repositories
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResponse<UserEntityDTO>()
+                    return new RepositoryResponse<UserEntity>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = StatusCode.General.InternalError,
+                        Message = ex.Message
+                    };
+                }
+            }
+        }
+
+        public async Task<RepositoryResponse<UserEntity>> UpdateAsync(UserEntity entity)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task<RepositoryResponse<UserEntity>> DeleteAsync(Guid id)
+        {
+            await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
+            {
+                try
+                {
+                    await conn.OpenAsync();
+
+                    await using (var deleteUser = new NpgsqlCommand(
+                        "DELETE FROM " +
+                            "Users_Table " +
+                        "WHERE id_user = @ID RETURNING *", conn))
+                    {
+                        deleteUser.Parameters.AddWithValue("@ID", id);
+
+                        await using(var readerInformationUser = await deleteUser.ExecuteReaderAsync())
+                        {
+                            if(await readerInformationUser.ReadAsync())
+                            {
+                                var userEntity = MapReaderToUser(readerInformationUser);
+
+                                return new RepositoryResponse<UserEntity>()
+                                {
+                                    IsSuccess = true,
+                                    StatusCode = StatusCode.General.Ok,
+                                    Message = "Користувача видалено!",
+                                    Data = userEntity
+                                };
+                            }
+                        }
+                    }
+
+                    return new RepositoryResponse<UserEntity>
+                    {
+                        IsSuccess = false,
+                        StatusCode = StatusCode.General.NotFound,
+                        Message = "Користувача не знайдено, видалення неможливе."
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new RepositoryResponse<UserEntity>
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.InternalError,
@@ -125,43 +177,6 @@ namespace Authorization.DAL.Repositories
             }
         }
 
-        public async Task<RepositoryResponse<Guid>> DeleteUserAsync(Guid userId)
-        {
-            await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
-            {
-                try
-                {
-                    await conn.OpenAsync();
-
-                    await using (var deleteUser = new NpgsqlCommand(
-                        "DELETE FROM " +
-                            "Users_Table " +
-                        "WHERE id_user = @ID", conn))
-                    {
-                        deleteUser.Parameters.AddWithValue("@ID", userId);
-
-                        await deleteUser.ExecuteNonQueryAsync();
-                    }
-
-                    return new RepositoryResponse<Guid>
-                    {
-                        IsSuccess = true,
-                        StatusCode = StatusCode.Delete.Ok,
-                        Message = "Користувача видалено!",
-                        Data = userId
-                    };
-                }
-                catch (Exception ex)
-                {
-                    return new RepositoryResponse<Guid>
-                    {
-                        IsSuccess = false,
-                        StatusCode = StatusCode.General.InternalError,
-                        Message = ex.Message
-                    };
-                }
-            }
-        }
 
         public async Task<RepositoryResponse<UserEntity>> GetUserByIdAsync(Guid userId)
         {
