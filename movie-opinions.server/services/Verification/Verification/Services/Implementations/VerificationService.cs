@@ -29,31 +29,27 @@ namespace Verification.Services.Implementations
 
         public async Task<ServiceResponse<string>> GenerateVerificationToken(Guid userId)
         {
-            string token = Guid.NewGuid().ToString();
+            string tokenGeneration = Guid.NewGuid().ToString();
             string tokenSalt = Guid.NewGuid().ToString();
 
-            // Перетворюємо пароль та ключ в масив байтів
-            byte[] tokenBytes = Encoding.UTF8.GetBytes(token + tokenSalt);
+            byte[] tokenBytes = Encoding.UTF8.GetBytes(tokenGeneration + tokenSalt);
 
-            // Обчислюємо хеш SHA-256 для об'єднаного масиву байтів паролю та ключа
             byte[] hashBytes = await Task.Run(() => new SHA256Managed().ComputeHash(tokenBytes));
 
-            // Перетворюємо масив байтів хешу в рядок Base64
             string hashedToken = Convert.ToBase64String(hashBytes);
 
             var tokenEntity = new VerificationEntity()
             {
                 Id = Guid.NewGuid(),
-                UserId = Guid.NewGuid(), // Заглушка дляюзера !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                Code = token,
-                CodeSalt = tokenSalt,
+                UserId = userId,
+                Code = hashedToken,
                 CreateAt = DateTime.Now,
                 ExpiryDate = DateTime.Now.AddDays(1),
                 Type = Models.Enums.VerificationType.URL
             };
 
             var createToken = await _verificationRepositories.CreateAsync(tokenEntity);
-
+            
             if(createToken.StatusCode != StatusCode.Create.Created)
             {
                 return new ServiceResponse<string>()
@@ -64,7 +60,7 @@ namespace Verification.Services.Implementations
                 };
             }
 
-            string createURL = $"https://localhost:7089/confirm-page?token={hashedToken}&user={123}";
+            string createURL = $"https://localhost:7089/confirm-page?token={hashedToken}";
 
             return new ServiceResponse<string>()
             {

@@ -4,6 +4,7 @@ using Authorization.DAL.Repositories;
 using Authorization.Services.Implementations;
 using Authorization.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Net.Http.Headers;
 using System.Text;
@@ -13,6 +14,17 @@ internal class Program
     private static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("FrontendPolicy", policy =>
+            {
+                policy.WithOrigins("http://localhost:3000")
+                      .AllowAnyHeader()
+                      .AllowAnyMethod()
+                      .AllowCredentials();
+            });
+        });
 
         // Add services to the container.
         var profileServiceUrl = builder.Configuration["ServiceUrls:ProfileService"];
@@ -41,6 +53,7 @@ internal class Program
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
+        builder.Services.AddHttpContextAccessor();
 
         builder.Services.AddAuthentication(option =>
         {
@@ -85,6 +98,9 @@ internal class Program
 
         app.UseHttpsRedirection();
 
+        app.UseCors("FrontendPolicy");
+
+        app.UseAuthentication();
         app.UseAuthorization();
 
         app.MapControllers();

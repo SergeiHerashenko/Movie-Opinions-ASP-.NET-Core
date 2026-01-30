@@ -8,5 +8,7 @@ namespace Authorization.Services.Interfaces
         Task<ServiceResponse<AuthorizationUserDTO>> LoginAsync(UserLoginModel loginModel);
 
         Task<ServiceResponse<AuthorizationUserDTO>> RegistrationAsync(UserRegisterModel registrationModel);
+
+        Task<ServiceResponse<AuthorizationUserDTO>> RefreshTokenAsync();
     }
 }

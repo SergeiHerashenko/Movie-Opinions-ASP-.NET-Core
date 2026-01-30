@@ -10,6 +10,8 @@ namespace Notification.Models.Notification
 
         public NotificationChannel Channel { get; set; }
 
+        public ContentType ContentType { get; set; }
+
         public string NameTemplate { get; set; }
 
         public NotificationStatus Status { get; set; }

@@ -34,7 +34,7 @@ namespace Notification.Services.Senders
                 await smtp.ConnectAsync("smtp.gmail.com", 587, SecureSocketOptions.StartTls);
 
                 // 5. Авторизація
-                await smtp.AuthenticateAsync("@gmail.com", "");
+                await smtp.AuthenticateAsync("", "");
 
                 // 6. Відправка
                 await smtp.SendAsync(email);

@@ -26,110 +26,99 @@ namespace Notification.Services.Implementations
 
         public async Task<ServiceResponse<StatusCode>> SendAsync(NotificationRequest notification)
         {
+            var messageEntity = new NotificationEntity()
+            {
+                Id = Guid.NewGuid(),
+                Channel = notification.Channel,
+                CreatedAt = DateTime.UtcNow,
+                Destination = notification.Destination,
+                NameTemplate = notification.TemplateName,
+                Status = NotificationStatus.Pending,
+                ContentType = notification.ContentType
+            };
+
+            var saveMessageEntity = await _notificationRepository.CreateAsync(messageEntity);
+
+            if (!saveMessageEntity.IsSuccess)
+            {
+                return new ServiceResponse<StatusCode>()
+                {
+                    IsSuccess = false,
+                    StatusCode = saveMessageEntity.StatusCode,
+                    Message = "Помилка бази даних!" + saveMessageEntity.Message
+                };
+            }
+
             var sender = _senders.FirstOrDefault(s => s.Channel == notification.Channel);
 
             if(sender == null)
             {
-                var errorSender = new NotificationEntity()
-                {
-                    Id = Guid.NewGuid(),
-                    Destination = notification.Destination,
-                    Channel = notification.Channel,
-                    NameTemplate = notification.TemplateName,
-                    Status = Models.Enum.NotificationStatus.Failed,
-                    CreatedAt = DateTime.UtcNow,
-                    ErrorMessage = "Неіснуючий спосіб сповіщення!"
-                };
+                messageEntity.Status = NotificationStatus.Failed;
+                messageEntity.ErrorMessage = "Неіснуючий спосіб сповіщення!";
 
-                var saveErrorSender = await _notificationRepository.CreateAsync(errorSender);
+                var saveErrorSender = await _notificationRepository.UpdateAsync(messageEntity);
+
+                if (!saveErrorSender.IsSuccess)
+                {
+                    return new ServiceResponse<StatusCode>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = saveErrorSender.StatusCode,
+                        Message = "Помилка бази даних!" + saveErrorSender.Message
+                    };
+                }
 
                 return new ServiceResponse<StatusCode>()
                 {
                     IsSuccess = false,
-                    StatusCode = saveErrorSender.StatusCode,
-                    Message = saveErrorSender.Message
+                    StatusCode = StatusCode.General.NotFound,
+                    Message = "Спосіб сповіщення не знайдено!"
                 };
             }
 
             try
             {
-                var templateRequest = new InternalRequest<object>()
+                var contentMessage = await PrepareNotificationContentAsync(notification, notification.IdUser);
+
+                if(contentMessage.IsSuccess != true)
                 {
-                    ClientName = "TemplateClient",
-                    Endpoint = $"api/template/templates/{notification.TemplateName}",
-                    Method = HttpMethod.Get
-                };
+                    messageEntity.Status = NotificationStatus.Failed;
 
-                var templateResponse = await SendInternalRequest<object, ServiceResponse<NotificationContent>>(templateRequest);
+                    var saveErrorMessqge = await _notificationRepository.UpdateAsync(messageEntity);
 
-                if (!templateResponse.IsSuccess)
+                    if (!saveErrorMessqge.IsSuccess)
+                    {
+                        return new ServiceResponse<StatusCode>()
+                        {
+                            IsSuccess = false,
+                            StatusCode = saveErrorMessqge.StatusCode,
+                            Message = "Помилка бази даних!" + saveErrorMessqge.Message
+                        };
+                    }
+
+                    return new ServiceResponse<StatusCode>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = contentMessage.StatusCode,
+                        Message = "Помилка!" + contentMessage.Message
+                    };
+                }
+
+                await sender.SendAsync(notification.Destination, contentMessage.Data);
+
+                messageEntity.Status = NotificationStatus.Sent;
+
+                var saveSender = await _notificationRepository.UpdateAsync(messageEntity);
+
+                if (!saveSender.IsSuccess)
                 {
                     return new ServiceResponse<StatusCode>()
                     {
                         IsSuccess = false,
-                        Message = $"Помилка шаблону {templateResponse.Message}"
+                        StatusCode = saveSender.StatusCode,
+                        Message = "Помилка бази даних!" + saveSender.Message
                     };
                 }
-
-                var template = templateResponse.Data.Data;
-
-                switch (notification.Channel)
-                {
-                    case NotificationChannel.Email:
-                        var verificationRequest = new InternalRequest<Guid>()
-                        {
-                            ClientName = "VerificationClient",
-                            Endpoint = "api/verification/token",
-                            Method = HttpMethod.Post,
-                            Body = notification.IdUser
-                        };
-
-                        var verificationResponse = await SendInternalRequest<Guid, VerificationResponse>(verificationRequest);
-
-                        if (!verificationResponse.IsSuccess)
-                        {
-                            return new ServiceResponse<StatusCode>()
-                            {
-                                IsSuccess = false,
-                                Message = $"Помилка верифікації {verificationResponse.Message}"
-                            };
-                        }
-
-                        var verificationToken = verificationResponse.Data;
-
-                        notification.TemplateData["URL"] = verificationToken.Data;
-
-                        break;
-
-                    case NotificationChannel.SMS:
-                        // Логіка смс
-                        break;
-
-                    case NotificationChannel.Viber:
-                        // Логіка Viber
-                        break;
-
-                    case NotificationChannel.Telegram:
-                        // Логіка Telegram
-                        break;
-                }
-
-                string? processedSubject = null;
-
-                if (notification.Channel == NotificationChannel.Email)
-                {
-                    processedSubject = ReplacePlaceholders(template.Subject, notification.TemplateData);
-                }
-
-                string processedBody = ReplacePlaceholders(template.Body, notification.TemplateData);
-
-                var contentText = new NotificationContent()
-                {
-                    Subject = processedSubject,
-                    Body = processedBody
-                };
-
-                await sender.SendAsync(notification.Destination, contentText);
 
                 return new ServiceResponse<StatusCode>
                 {
@@ -140,6 +129,20 @@ namespace Notification.Services.Implementations
             }
             catch (Exception ex)
             {
+                messageEntity.Status = NotificationStatus.Failed;
+                messageEntity.ErrorMessage = ex.Message;
+
+                var saveExSender = await _notificationRepository.UpdateAsync(messageEntity);
+
+                if (!saveExSender.IsSuccess)
+                {
+                    return new ServiceResponse<StatusCode>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = saveExSender.StatusCode,
+                        Message = "Помилка бази даних!" + saveExSender.Message
+                    };
+                }
                 return new ServiceResponse<StatusCode>()
                 {
                     IsSuccess = false,
@@ -205,6 +208,77 @@ namespace Notification.Services.Implementations
                     StatusCode = 500
                 };
             }
+        }
+
+        private async Task<ServiceResponse<NotificationContent>> PrepareNotificationContentAsync(NotificationRequest notification, Guid idUser)
+        {
+            var templateRequest = new InternalRequest<object>()
+            {
+                ClientName = "TemplateClient",
+                Endpoint = $"api/template/templates/{notification.TemplateName}",
+                Method = HttpMethod.Get
+            };
+
+            var templateResponse = await SendInternalRequest<object, ServiceResponse<NotificationContent>>(templateRequest);
+
+            if (!templateResponse.IsSuccess)
+            {
+                return new ServiceResponse<NotificationContent>()
+                {
+                    IsSuccess = false,
+                    Message = $"Помилка шаблону {templateResponse.Message}"
+                };
+            }
+
+            var template = templateResponse.Data.Data;
+
+            string endpoint = (notification.ContentType == ContentType.URL) ? "token" : "code";
+
+            var verificationRequest = new InternalRequest<Guid>()
+            {
+                ClientName = "VerificationClient",
+                Endpoint = $"api/verification/{endpoint}",
+                Method = HttpMethod.Post,
+                Body = idUser
+            };
+
+            var verificationResponse = await SendInternalRequest<Guid, VerificationResponse>(verificationRequest);
+
+            if (!verificationResponse.IsSuccess)
+            {
+                return new ServiceResponse<NotificationContent>()
+                {
+                    IsSuccess = false,
+                    Message = $"Помилка верифікації {verificationResponse.Message}"
+                };
+            }
+
+            var verificationToken = verificationResponse.Data;
+
+            notification.TemplateData[(notification.ContentType == ContentType.URL) ? "URL" : "Code"] = verificationToken.Data;
+
+            string? processedSubject = null;
+
+            if (notification.Channel == NotificationChannel.Email)
+            {
+                processedSubject = ReplacePlaceholders(template.Subject, notification.TemplateData);
+            }
+
+            string processedBody = ReplacePlaceholders(template.Body, notification.TemplateData);
+
+            var contentText = new NotificationContent()
+            {
+                Subject = processedSubject,
+                Body = processedBody
+            };
+
+            return new ServiceResponse<NotificationContent>()
+            {
+                IsSuccess =true,
+                Data = contentText,
+                StatusCode = StatusCode.Create.Created,
+                Message = "Повідомлення створене!"
+            };
         }
     }
 }

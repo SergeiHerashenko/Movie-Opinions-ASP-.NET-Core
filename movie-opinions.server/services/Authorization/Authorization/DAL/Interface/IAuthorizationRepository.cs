@@ -9,5 +9,9 @@ namespace Authorization.DAL.Interface
         Task<RepositoryResponse<UserEntity>> GetUserByEmailAsync(string email);
 
         Task<RepositoryResponse<UserEntity>> GetUserByIdAsync(Guid userId);
+
+        Task<RepositoryResponse<UserTokenEntity>> CreateTokenAsync(UserTokenEntity tokenEntity);
+
+        Task<RepositoryResponse<UserTokenEntity>> GetTokenAsync(string refreshToken, Guid idUser);
     }
 }

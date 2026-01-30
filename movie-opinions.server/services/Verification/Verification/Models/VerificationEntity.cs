@@ -10,8 +10,6 @@ namespace Verification.Models
 
         public string Code { get; set; }
 
-        public string CodeSalt { get; set; }
-
         public VerificationType Type { get; set; }
 
         public DateTime CreateAt { get; set; }

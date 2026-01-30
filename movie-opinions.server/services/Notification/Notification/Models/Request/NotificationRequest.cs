@@ -12,6 +12,9 @@ namespace Notification.Models.Request
         public string Destination { get; set; } = string.Empty;
 
         [Required]
+        public ContentType ContentType { get; set; }
+
+        [Required]
         public NotificationChannel Channel { get; set; }
 
         [Required]

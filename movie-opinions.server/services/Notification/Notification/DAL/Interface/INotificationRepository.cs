@@ -6,6 +6,8 @@ namespace Notification.DAL.Interface
 {
     public interface INotificationRepository : IBaseRepository<NotificationEntity, RepositoryResponse<NotificationEntity>>
     {
+        Task <RepositoryResponse<NotificationEntity>> GetNotificationById(Guid idNotification);
 
+        Task<RepositoryResponse<IEnumerable<NotificationEntity>>> GetByFilterAsync<TValue>(string columnName, TValue value);
     }
 }

@@ -1,3 +1,4 @@
+using Notification.DAL.Connect_Database;
 using Notification.DAL.Interface;
 using Notification.DAL.Repositories;
 using Notification.Services.Implementations;
@@ -34,6 +35,7 @@ internal class Program
 
         builder.Services.AddScoped<INotificationService, NotificationService>();
         builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+        builder.Services.AddScoped<IConnectNotificationDb, ConnectNotificationDb>();
         builder.Services.AddScoped<ISender, EmailSender>();
         builder.Services.AddScoped<ISender, SmsSender>();
 

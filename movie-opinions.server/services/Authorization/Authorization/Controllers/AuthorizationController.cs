@@ -1,6 +1,7 @@
 ﻿using Authorization.Models.User;
 using Authorization.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Status = MovieOpinions.Contracts.Models.StatusCode;
 
 namespace Authorization.Controllers
 {
@@ -24,7 +25,9 @@ namespace Authorization.Controllers
 
                 if (!result.IsSuccess)
                 {
-                    return BadRequest(result);
+                    return result.StatusCode == Status.Create.Conflict
+                        ? Conflict(result)
+                        : BadRequest(result);
                 }
 
                 return Ok(result);
@@ -38,10 +41,37 @@ namespace Authorization.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] UserLoginModel model)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            try
+            {
+                var result = await _authorizationService.LoginAsync(model);
 
-            var result = await _authorizationService.LoginAsync(model);
+                if (!result.IsSuccess)
+                {
+                    return (int)result.StatusCode switch
+                    {
+                        Status.Auth.Unauthorized => Unauthorized(result),
+                        Status.Auth.Locked => StatusCode(423, result),
+                        Status.Verification.Expired => StatusCode(410, result),
+                        _ => BadRequest(result)
+                    };
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "An internal error occurred during login.");
+            }
+        }
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh()
+        {
+            var result = await _authorizationService.RefreshTokenAsync();
+
+            if (!result.IsSuccess)
+                return Unauthorized(result);
+
             return Ok(result);
         }
     }
