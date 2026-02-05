@@ -1,5 +1,4 @@
-﻿using MovieOpinions.Contracts.Enum;
-using MovieOpinions.Contracts.Models;
+﻿using MovieOpinions.Contracts.Models;
 using MovieOpinions.Contracts.Models.RepositoryResponse;
 using Npgsql;
 using Profile.DAL.Connect_Database;

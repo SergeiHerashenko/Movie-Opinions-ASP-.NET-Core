@@ -1,31 +1,40 @@
-﻿using Authorization.DAL.Interface;
-using Authorization.Helpers;
+﻿using Authorization.Application.Interfaces;
+using Authorization.DAL.Interface;
+using Authorization.Domain.Entities;
+using Authorization.Infrastructure.Cookies.Interfaces;
+using Authorization.Infrastructure.Cryptography;
+using Authorization.Infrastructure.IdentityAccessor;
+using Authorization.Infrastructure.InternalCommunication;
+using Authorization.Infrastructure.JWT.Interfaces;
 using Authorization.Models.User;
-using Authorization.Services.Interfaces;
-using Microsoft.IdentityModel.Tokens;
 using MovieOpinions.Contracts.Enum;
 using MovieOpinions.Contracts.Models;
 using MovieOpinions.Contracts.Models.ServiceResponse;
-using MovieOpinions.Contracts.Models.ServiceResult;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 
-namespace Authorization.Services.Implementations
+namespace Authorization.Application.Services
 {
     public class AuthorizationService : IAuthorizationService
     {
         private readonly IAuthorizationRepository _authorizationRepository;
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IConfiguration _configuration;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ISendInternalRequest _sendInternalRequest;
+        private readonly IIdentityAccessor _identityAccessor;
+        private readonly IJwtProvider _jwtProvider;
+        private readonly ICookieProvider _cookieProvider;
+        private readonly IPasswordHasher _passwordHasher;
 
-        public AuthorizationService(IAuthorizationRepository authorizationRepository, IHttpClientFactory httpClient, IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
+        public AuthorizationService(IAuthorizationRepository authorizationRepository,
+            ICookieProvider cookieProvider,
+            ISendInternalRequest sendInternalRequest,
+            IIdentityAccessor identityAccessor,
+            IJwtProvider jwtProvider,
+            IPasswordHasher passwordHasher)
         {
             _authorizationRepository = authorizationRepository;
-            _httpClientFactory = httpClient;
-            _configuration = configuration;
-            _httpContextAccessor = httpContextAccessor;
+            _cookieProvider = cookieProvider;
+            _sendInternalRequest = sendInternalRequest;
+            _identityAccessor = identityAccessor;
+            _jwtProvider = jwtProvider;
+            _passwordHasher = passwordHasher;
         }
 
         public async Task<ServiceResponse<AuthorizationUserDTO>> LoginAsync(UserLoginModel loginModel)
@@ -44,7 +53,7 @@ namespace Authorization.Services.Implementations
                     };
                 }
 
-                bool isPasswordCorrect = await new CheckingCorrectnessPassword().VerifyPasswordAsync(
+                bool isPasswordCorrect = await _passwordHasher.VerifyPasswordAsync(
                     loginModel.Password,
                     getUser.Data.PasswordSalt,
                     getUser.Data.PasswordHash);
@@ -123,21 +132,35 @@ namespace Authorization.Services.Implementations
                     ClientName = "ProfileClient",
                     Endpoint = "api/profile/create",
                     Method = HttpMethod.Post,
-                    Body = new { UserId = newUser.UserId, Email = newUser.Email }
+                    Body = new { newUser.UserId, newUser.Email }
                 };
 
-                var responseProfile = await SendInternalRequest<object, Guid>(profileRequest);
+                try
+                {
+                    var responseProfile = await _sendInternalRequest.SendAsync<object, Guid>(profileRequest);
 
-                if (!responseProfile.IsSuccess)
+                    if (!responseProfile.IsSuccess)
+                    {
+                        // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
+                        await _authorizationRepository.DeleteAsync(newUser.UserId);
+
+                        return new ServiceResponse<AuthorizationUserDTO>
+                        {
+                            IsSuccess = false,
+                            StatusCode = (int)responseProfile.StatusCode,
+                            Message = responseProfile?.Message ?? "Сервіс профілів повернув помилку"
+                        };
+                    }
+                }
+                catch (Exception ex)
                 {
                     // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
                     await _authorizationRepository.DeleteAsync(newUser.UserId);
-                    
+
                     return new ServiceResponse<AuthorizationUserDTO>
                     {
                         IsSuccess = false,
-                        StatusCode = (int)responseProfile.StatusCode,
-                        Message = responseProfile?.Message ?? "Сервіс профілів повернув помилку"
+                        Message = "Помилка зв'язку з сервісом профілів." + ex.Message,
                     };
                 }
 
@@ -161,7 +184,7 @@ namespace Authorization.Services.Implementations
                         }
                 };
 
-                var responseNotification = await SendInternalRequest<object, object>(notificationRequest);
+                var responseNotification = await _sendInternalRequest.SendAsync<object, object>(notificationRequest);
 
                 var tokenModel = new UserTokenModel()
                 {
@@ -170,20 +193,13 @@ namespace Authorization.Services.Implementations
                     IsEmailConfirmed = registerUser.Data.IsEmailConfirmed
                 };
 
-                var token = GenerateJwtToken(tokenModel);
-
-                var userDTO = new AuthorizationUserDTO()
-                {
-                    UserId = registerUser.Data.UserId,
-                    Token = token,
-                    // Додати інші поля (Поки не розумію)
-                };
+                var createUserSessionAsync = await CreateUserSessionAsync(newUser);
 
                 return new ServiceResponse<AuthorizationUserDTO>
                 {
                     IsSuccess = true,
                     StatusCode = StatusCode.General.Ok,
-                    Data = userDTO,
+                    Data = createUserSessionAsync.Data,
                     Message = responseNotification.IsSuccess
                         ? "Реєстрація успішна! Перевірте вашу пошту для підтвердження."
                         : "Реєстрація успішна! Але виникла проблема з відправкою листа. Надішліть його повторно в налаштуваннях."       
@@ -200,23 +216,30 @@ namespace Authorization.Services.Implementations
             }
         }
 
+        public async Task<ServiceResponse<bool>> LogoutAsync()
+        {
+            _cookieProvider.ClearAuthCookies();
+
+            return new ServiceResponse<bool>
+            {
+                IsSuccess = true,
+                StatusCode = StatusCode.General.Ok,
+                Message = "Вихід успішний",
+                Data = true
+            };
+        }
+
         public async Task<ServiceResponse<AuthorizationUserDTO>> RefreshTokenAsync()
         {
-            var oldAccessToken = _httpContextAccessor.HttpContext.Request.Cookies["jwt"];
-            var refreshToken = _httpContextAccessor.HttpContext.Request.Cookies["X-Refresh-Token"];
+            // 1. Отримуємо дані
+            var userId = _identityAccessor.UserId;
+            var refreshToken = _identityAccessor.RefreshToken;
 
-            if (string.IsNullOrEmpty(refreshToken) || string.IsNullOrEmpty(oldAccessToken))
+            if (userId == null || string.IsNullOrEmpty(refreshToken))
                 return new ServiceResponse<AuthorizationUserDTO> { IsSuccess = false, Message = "Сесія втрачена" };
 
-            // 1. Отримуємо Claims із простроченого токена
-            var principal = GetPrincipalFromExpiredToken(oldAccessToken);
-            var userIdStr = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
-
-            if (!Guid.TryParse(userIdStr, out var userId))
-                return new ServiceResponse<AuthorizationUserDTO> { IsSuccess = false, Message = "Невалідний токен" };
-
             // 2. Шукаємо токен у базі
-            var userToken = await _authorizationRepository.GetTokenAsync(refreshToken, userId);
+            var userToken = await _authorizationRepository.GetTokenAsync(refreshToken, userId.Value);
 
             // 3. Перевіряємо валідність
             if (userToken.Data == null || userToken.Data.RefreshTokenExpiration <= DateTime.UtcNow)
@@ -225,85 +248,32 @@ namespace Authorization.Services.Implementations
             }
 
             // 4. Шукаємо самого юзера, щоб створити йому нову сесію
-            var user = await _authorizationRepository.GetUserByIdAsync(userId);
+            var user = await _authorizationRepository.GetUserByIdAsync(userId.Value);
 
-            // 5. Просто викликаємо твій готовий метод!
             return await CreateUserSessionAsync(user.Data);
         }
 
-        private ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
+        public async Task<ServiceResponse<AuthorizationUserDTO>> ChangePasswordAsync()
         {
-            var tokenValidationParameters = new TokenValidationParameters
+            try
             {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"])),
-                ValidateIssuer = true,
-                ValidIssuer = _configuration["Jwt:Issuer"],
-                ValidateAudience = true,
-                ValidAudience = _configuration["Jwt:Audience"],
-                ValidateLifetime = false 
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out SecurityToken securityToken);
-
-            if (securityToken is not JwtSecurityToken jwtSecurityToken ||
-                !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-                throw new SecurityTokenException("Невалідний токен");
-
-            return principal;
-        }
-
-        private string GenerateJwtToken(UserTokenModel user)
-        {
-            // 1. Створюємо список Claims
-            var claims = new List<Claim>
-            {
-                // Використовуємо JwtRegisteredClaimNames для стандартизації
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()), // Унікальний ID токена
-        
-                new Claim("email_confirmed", user.IsEmailConfirmed.ToString().ToLower()),
-
-                new Claim(ClaimTypes.Role, "User")
-            };
-
-            // 2. Отримуємо ключ із конфігурації
-            var jwtKey = _configuration["Jwt:Key"];
-            if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
-            {
-                throw new Exception("Критична помилка: JWT Key занадто короткий або відсутній!");
+                return new ServiceResponse<AuthorizationUserDTO>
+                {
+                    IsSuccess = false,
+                };
             }
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            // 3. Створюємо сам токен
-            var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(15),
-                signingCredentials: creds
-            );
-
-            // 4. Повертаємо серіалізований рядок
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            catch (Exception ex)
+            {
+                return new ServiceResponse<AuthorizationUserDTO>
+                {
+                    IsSuccess = false,
+                    StatusCode = StatusCode.General.InternalError,
+                    Message = ex.Message,
+                };
+            }
         }
 
-        private string GenerateRefreshToken()
-        {
-            var randomNumber = new byte[64];
-
-            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-
-            rng.GetBytes(randomNumber);
-
-            return Convert.ToBase64String(randomNumber);
-        }
-
-        private async Task<ServiceResponse<AuthorizationUserDTO>> CreateUserSessionAsync(UserEntity user)
+        private async Task<ServiceResponse<AuthorizationUserDTO>> CreateUserSessionAsync(User user)
         {
             // 1. Готуємо модель для JWT
             var tokenModel = new UserTokenModel()
@@ -314,12 +284,10 @@ namespace Authorization.Services.Implementations
             };
 
             // 2. Генеруємо токени
-            var accessToken = GenerateJwtToken(tokenModel);
-            var refreshToken = GenerateRefreshToken();
+            var accessToken = _jwtProvider.GenerateAccessToken(tokenModel);
+            var refreshToken = _jwtProvider.GenerateRefreshToken();
 
-            SetCookie("jwt", accessToken, DateTime.UtcNow.AddMinutes(15));
-
-            SetCookie("X-Refresh-Token", refreshToken, DateTime.UtcNow.AddDays(7));
+            _cookieProvider.SetAuthCookies(accessToken, refreshToken);
 
             // 3. Формуємо сутність для БД
             var userToken = new UserTokenEntity()
@@ -344,7 +312,7 @@ namespace Authorization.Services.Implementations
                 };
             }
 
-            // 5. Повертаємо готовий DTO
+            // 4. Повертаємо готовий DTO
             return new ServiceResponse<AuthorizationUserDTO>
             {
                 IsSuccess = true,
@@ -357,20 +325,7 @@ namespace Authorization.Services.Implementations
             };
         }
 
-        private void SetCookie(string name, string value, DateTime expires)
-        {
-            var options = new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict,
-                Expires = expires,
-                Path = "/" // Важливо, щоб кука була доступна для всіх запитів
-            };
-            _httpContextAccessor.HttpContext.Response.Cookies.Append(name, value, options);
-        }
-
-        private ServiceResponse<AuthorizationUserDTO> CheckUserAccess(UserEntity userResponse)
+        private ServiceResponse<AuthorizationUserDTO> CheckUserAccess(User userResponse)
         {
             if (userResponse.IsBlocked)
             {
@@ -400,12 +355,12 @@ namespace Authorization.Services.Implementations
             };
         }
 
-        private async Task<UserEntity> CreateNewUserEntityAsync(UserRegisterModel registrationModel)
+        private async Task<User> CreateNewUserEntityAsync(UserRegisterModel registrationModel)
         {
             string passwordSalt = Guid.NewGuid().ToString();
-            string encryptionPassword = await new HashPassword().GetHashedPasswordAsync(registrationModel.Password, passwordSalt);
+            string encryptionPassword = await _passwordHasher.HashPasswordAsync(registrationModel.Password, passwordSalt);
 
-            return new UserEntity()
+            return new User()
             {
                 UserId = Guid.NewGuid(),
                 Email = registrationModel.Email,
@@ -417,54 +372,6 @@ namespace Authorization.Services.Implementations
                 IsBlocked = false,
                 IsDeleted = false,
             };
-        }
-
-        private async Task<ServiceResponse<TResponse>> SendInternalRequest<TBody, TResponse>(InternalRequest<TBody> internalReques)
-        {
-            try
-            {
-                var client = _httpClientFactory.CreateClient(internalReques.ClientName);
-                HttpResponseMessage response;
-
-                if (internalReques.Method == HttpMethod.Post)
-                {
-                    response = await client.PostAsJsonAsync(internalReques.Endpoint, internalReques.Body);
-                }
-                else
-                {
-                    response = await client.GetAsync(internalReques.Endpoint);
-                }
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var result = await response.Content.ReadFromJsonAsync<TResponse>();
-
-                    return new ServiceResponse<TResponse>
-                    {
-                        IsSuccess = true,
-                        Data = result,
-                        StatusCode = (int)response.StatusCode
-                    };
-                }
-
-                var errorData = await response.Content.ReadFromJsonAsync<ServiceResult<object>>();
-
-                return new ServiceResponse<TResponse>
-                {
-                    IsSuccess = false,
-                    Message = errorData?.Message ?? response.ReasonPhrase,
-                    StatusCode = (int)response.StatusCode
-                };
-            }
-            catch (Exception ex)
-            {
-                return new ServiceResponse<TResponse>
-                {
-                    IsSuccess = false,
-                    Message = $"Критична помилка: {ex.Message}",
-                    StatusCode = 500
-                };
-            }
         }
     }
 }

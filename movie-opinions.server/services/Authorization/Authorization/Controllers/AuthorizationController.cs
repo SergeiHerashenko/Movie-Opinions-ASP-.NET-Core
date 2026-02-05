@@ -1,6 +1,7 @@
-﻿using Authorization.Models.User;
-using Authorization.Services.Interfaces;
+﻿using Authorization.Application.Interfaces;
+using Authorization.Models.User;
 using Microsoft.AspNetCore.Mvc;
+using AspNetAuth = Microsoft.AspNetCore.Authorization;
 using Status = MovieOpinions.Contracts.Models.StatusCode;
 
 namespace Authorization.Controllers
@@ -34,7 +35,7 @@ namespace Authorization.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An internal error occurred during registration.");
+                return StatusCode(500, "Під час реєстрації сталася внутрішня помилка!");
             }
         }
 
@@ -60,8 +61,15 @@ namespace Authorization.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An internal error occurred during login.");
+                return StatusCode(500, "Під час входу сталася внутрішня помилка!");
             }
+        }
+
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
+        {
+            var result = await _authorizationService.LogoutAsync();
+            return Ok(result);
         }
 
         [HttpPost("refresh")]
@@ -73,6 +81,29 @@ namespace Authorization.Controllers
                 return Unauthorized(result);
 
             return Ok(result);
+        }
+
+        [AspNetAuth.Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordModel model)
+        {
+            try
+            {
+                var change = await _authorizationService.ChangePasswordAsync();
+
+                if (!change.IsSuccess)
+                {
+                    return change.StatusCode == Status.Create.Conflict
+                        ? Conflict(change)
+                        : BadRequest(change);
+                }
+
+                return Ok(change);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Під час зміни паролю сталась внутрішня помилка!");
+            }
         }
     }
 }

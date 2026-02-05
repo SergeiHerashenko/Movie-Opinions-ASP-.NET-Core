@@ -1,12 +1,17 @@
+using Authorization.Application.Interfaces;
+using Authorization.Application.Services;
 using Authorization.DAL.Connect_Database;
 using Authorization.DAL.Interface;
 using Authorization.DAL.Repositories;
-using Authorization.Services.Implementations;
-using Authorization.Services.Interfaces;
+using Authorization.Infrastructure.Cookies.Implementations;
+using Authorization.Infrastructure.Cookies.Interfaces;
+using Authorization.Infrastructure.Cryptography;
+using Authorization.Infrastructure.IdentityAccessor;
+using Authorization.Infrastructure.InternalCommunication;
+using Authorization.Infrastructure.JWT.Implementations;
+using Authorization.Infrastructure.JWT.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using System.Net.Http.Headers;
 using System.Text;
 
 internal class Program
@@ -46,9 +51,14 @@ internal class Program
             client.BaseAddress = new Uri(notificationServiceUrl);
         });
 
-        builder.Services.AddSingleton<IConnectAuthorizationDb, ConnectAuthorizationDb>();
+        builder.Services.AddScoped<IConnectAuthorizationDb, ConnectAuthorizationDb>();
         builder.Services.AddScoped<IAuthorizationRepository, AuthorizationRepository>();
         builder.Services.AddScoped<IAuthorizationService, AuthorizationService>();
+        builder.Services.AddScoped<ICookieProvider, CookieProvider>();
+        builder.Services.AddScoped<IJwtProvider, JwtProvider>();
+        builder.Services.AddScoped<ISendInternalRequest, SendInternalRequest>();
+        builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        builder.Services.AddScoped<IIdentityAccessor, IdentityAccessor>();
 
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();

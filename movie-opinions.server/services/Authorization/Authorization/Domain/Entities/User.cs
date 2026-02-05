@@ -1,8 +1,8 @@
 ﻿using MovieOpinions.Contracts.Enum;
 
-namespace Authorization.Models.User
+namespace Authorization.Domain.Entities
 {
-    public class UserEntity
+    public class User
     {
         public Guid UserId { get; set; }
 
@@ -15,6 +15,8 @@ namespace Authorization.Models.User
         public Role Role { get; set; }
 
         public DateTime CreatedAt { get; set; }
+
+        public DateTime LastLoginAt { get; set; }
 
         public bool IsEmailConfirmed { get; set; }
 

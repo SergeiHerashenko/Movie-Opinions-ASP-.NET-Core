@@ -1,7 +1,7 @@
 ﻿using Authorization.Models.User;
 using MovieOpinions.Contracts.Models.ServiceResponse;
 
-namespace Authorization.Services.Interfaces
+namespace Authorization.Application.Interfaces
 {
     public interface IAuthorizationService
     {
@@ -9,6 +9,10 @@ namespace Authorization.Services.Interfaces
 
         Task<ServiceResponse<AuthorizationUserDTO>> RegistrationAsync(UserRegisterModel registrationModel);
 
+        Task<ServiceResponse<bool>> LogoutAsync();
+
         Task<ServiceResponse<AuthorizationUserDTO>> RefreshTokenAsync();
+
+        Task<ServiceResponse<AuthorizationUserDTO>> ChangePasswordAsync();
     }
 }

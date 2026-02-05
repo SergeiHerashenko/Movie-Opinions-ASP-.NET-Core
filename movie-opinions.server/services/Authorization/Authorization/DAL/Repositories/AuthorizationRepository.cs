@@ -1,11 +1,11 @@
 ﻿using Authorization.DAL.Connect_Database;
 using Authorization.DAL.Interface;
+using Authorization.Domain.Entities;
 using Authorization.Models.User;
 using MovieOpinions.Contracts.Enum;
 using MovieOpinions.Contracts.Models;
 using MovieOpinions.Contracts.Models.RepositoryResponse;
 using Npgsql;
-using XAct.Users;
 
 namespace Authorization.DAL.Repositories
 {
@@ -18,7 +18,7 @@ namespace Authorization.DAL.Repositories
             _connectAuthorizationhDb = connectAuthorizationDb;
         }
 
-        public async Task<RepositoryResponse<UserEntity>> CreateAsync(UserEntity entity)
+        public async Task<RepositoryResponse<User>> CreateAsync(User entity)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -34,7 +34,7 @@ namespace Authorization.DAL.Repositories
 
                             await transaction.CommitAsync();
 
-                            return new RepositoryResponse<UserEntity>()
+                            return new RepositoryResponse<User>()
                             {
                                 IsSuccess = true,
                                 StatusCode = StatusCode.Create.Created,
@@ -46,7 +46,7 @@ namespace Authorization.DAL.Repositories
                         {
                             await transaction.RollbackAsync();
 
-                            return new RepositoryResponse<UserEntity>()
+                            return new RepositoryResponse<User>()
                             {
                                 IsSuccess = false,
                                 StatusCode = StatusCode.General.InternalError,
@@ -57,7 +57,7 @@ namespace Authorization.DAL.Repositories
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResponse<UserEntity>()
+                    return new RepositoryResponse<User>()
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.InternalError,
@@ -137,7 +137,7 @@ namespace Authorization.DAL.Repositories
                             "refresh_token = @RefreshToken AND id_user = @IdUser", conn))
                     {
                         getToken.Parameters.AddWithValue("@RefreshToken", refreshToken);
-                        getToken.Parameters.AddWithValue("IdUser", idUser);
+                        getToken.Parameters.AddWithValue("@IdUser", idUser);
 
                         await using (var readerInformationToken = await getToken.ExecuteReaderAsync())
                         {
@@ -175,7 +175,7 @@ namespace Authorization.DAL.Repositories
             }
         }
 
-        public async Task<RepositoryResponse<UserEntity>> UpdateAsync(UserEntity entity)
+        public async Task<RepositoryResponse<User>> UpdateAsync(User entity)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -213,7 +213,7 @@ namespace Authorization.DAL.Repositories
                         {
                             if(await readerUpdateUser.ReadAsync())
                             {
-                                return new RepositoryResponse<UserEntity>()
+                                return new RepositoryResponse<User>()
                                 {
                                     IsSuccess = true,
                                     StatusCode = StatusCode.Update.Ok,
@@ -224,7 +224,7 @@ namespace Authorization.DAL.Repositories
                         }
                     }
 
-                    return new RepositoryResponse<UserEntity>()
+                    return new RepositoryResponse<User>()
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.NotFound,
@@ -233,7 +233,7 @@ namespace Authorization.DAL.Repositories
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResponse<UserEntity>
+                    return new RepositoryResponse<User>
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.InternalError,
@@ -243,7 +243,7 @@ namespace Authorization.DAL.Repositories
             }
         }
 
-        public async Task<RepositoryResponse<UserEntity>> DeleteAsync(Guid id)
+        public async Task<RepositoryResponse<User>> DeleteAsync(Guid id)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -265,7 +265,7 @@ namespace Authorization.DAL.Repositories
                             {
                                 var userEntity = MapReaderToUser(readerInformationUser);
 
-                                return new RepositoryResponse<UserEntity>()
+                                return new RepositoryResponse<User>()
                                 {
                                     IsSuccess = true,
                                     StatusCode = StatusCode.General.Ok,
@@ -276,7 +276,7 @@ namespace Authorization.DAL.Repositories
                         }
                     }
 
-                    return new RepositoryResponse<UserEntity>
+                    return new RepositoryResponse<User>
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.NotFound,
@@ -285,7 +285,7 @@ namespace Authorization.DAL.Repositories
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResponse<UserEntity>
+                    return new RepositoryResponse<User>
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.InternalError,
@@ -295,7 +295,7 @@ namespace Authorization.DAL.Repositories
             }
         }
 
-        public async Task<RepositoryResponse<UserEntity>> GetUserByEmailAsync(string email)
+        public async Task<RepositoryResponse<User>> GetUserByEmailAsync(string email)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -319,7 +319,7 @@ namespace Authorization.DAL.Repositories
                             {
                                 var userEntity = MapReaderToUser(readerInformationUser);
 
-                                return new RepositoryResponse<UserEntity>()
+                                return new RepositoryResponse<User>()
                                 {
                                     IsSuccess = true,
                                     StatusCode = StatusCode.General.Ok,
@@ -330,7 +330,7 @@ namespace Authorization.DAL.Repositories
                         }
                     }
 
-                    return new RepositoryResponse<UserEntity>()
+                    return new RepositoryResponse<User>()
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.NotFound,
@@ -339,7 +339,7 @@ namespace Authorization.DAL.Repositories
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResponse<UserEntity>()
+                    return new RepositoryResponse<User>()
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.InternalError,
@@ -349,7 +349,7 @@ namespace Authorization.DAL.Repositories
             }
         }
 
-        public async Task<RepositoryResponse<UserEntity>> GetUserByIdAsync(Guid userId)
+        public async Task<RepositoryResponse<User>> GetUserByIdAsync(Guid userId)
         {
             await using (var conn = new NpgsqlConnection(_connectAuthorizationhDb.GetConnectAuthorizationDatabase()))
             {
@@ -373,7 +373,7 @@ namespace Authorization.DAL.Repositories
                             {
                                 var userEntity = MapReaderToUser(readerInformationUser);
 
-                                return new RepositoryResponse<UserEntity>()
+                                return new RepositoryResponse<User>()
                                 {
                                     IsSuccess = true,
                                     StatusCode = StatusCode.General.Ok,
@@ -384,7 +384,7 @@ namespace Authorization.DAL.Repositories
                         }
                     }
 
-                    return new RepositoryResponse<UserEntity>()
+                    return new RepositoryResponse<User>()
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.NotFound,
@@ -393,7 +393,7 @@ namespace Authorization.DAL.Repositories
                 }
                 catch (Exception ex)
                 {
-                    return new RepositoryResponse<UserEntity>()
+                    return new RepositoryResponse<User>()
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.InternalError,
@@ -403,7 +403,7 @@ namespace Authorization.DAL.Repositories
             }
         }
 
-        private async Task InsertUserTableAsync(NpgsqlConnection conn, NpgsqlTransaction transaction, UserEntity entity)
+        private async Task InsertUserTableAsync(NpgsqlConnection conn, NpgsqlTransaction transaction, User entity)
         {
             await using (var insertUserTable = new NpgsqlCommand(
                 "INSERT INTO " +
@@ -423,9 +423,9 @@ namespace Authorization.DAL.Repositories
             }
         }
 
-        private UserEntity MapReaderToUser(NpgsqlDataReader reader)
+        private User MapReaderToUser(NpgsqlDataReader reader)
         {
-            return new UserEntity()
+            return new User()
             {
                 UserId = reader.GetGuid(reader.GetOrdinal("id_user")),
                 Email = reader["email_user"].ToString(),
