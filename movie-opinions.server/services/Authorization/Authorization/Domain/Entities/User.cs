@@ -16,7 +16,7 @@ namespace Authorization.Domain.Entities
 
         public DateTime CreatedAt { get; set; }
 
-        public DateTime LastLoginAt { get; set; }
+        public DateTime? LastLoginAt { get; set; }
 
         public bool IsEmailConfirmed { get; set; }
 

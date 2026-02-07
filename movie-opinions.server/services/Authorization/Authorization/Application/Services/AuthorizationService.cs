@@ -1,12 +1,10 @@
-﻿using Authorization.Application.Interfaces;
+﻿using Authorization.Application.Interfaces.Integration;
+using Authorization.Application.Interfaces.Security;
+using Authorization.Application.Interfaces.Services;
 using Authorization.DAL.Interface;
+using Authorization.Domain.DTO;
 using Authorization.Domain.Entities;
-using Authorization.Infrastructure.Cookies.Interfaces;
-using Authorization.Infrastructure.Cryptography;
-using Authorization.Infrastructure.IdentityAccessor;
-using Authorization.Infrastructure.InternalCommunication;
-using Authorization.Infrastructure.JWT.Interfaces;
-using Authorization.Models.User;
+using Authorization.Domain.Request;
 using MovieOpinions.Contracts.Enum;
 using MovieOpinions.Contracts.Models;
 using MovieOpinions.Contracts.Models.ServiceResponse;
@@ -15,52 +13,62 @@ namespace Authorization.Application.Services
 {
     public class AuthorizationService : IAuthorizationService
     {
-        private readonly IAuthorizationRepository _authorizationRepository;
-        private readonly ISendInternalRequest _sendInternalRequest;
-        private readonly IIdentityAccessor _identityAccessor;
-        private readonly IJwtProvider _jwtProvider;
-        private readonly ICookieProvider _cookieProvider;
+        private readonly ILogger<AuthorizationService> _logger;
+        private readonly IUserRepository _userRepository;
         private readonly IPasswordHasher _passwordHasher;
+        private readonly ISendInternalRequest _sendInternalRequest;
+        private readonly IAccessService _accessService;
+        private readonly ITokenService _tokenService;
+        
 
-        public AuthorizationService(IAuthorizationRepository authorizationRepository,
-            ICookieProvider cookieProvider,
+        public AuthorizationService(
+            ILogger<AuthorizationService> logger, 
+            IUserRepository userRepository, 
+            IPasswordHasher passwordHasher,
             ISendInternalRequest sendInternalRequest,
-            IIdentityAccessor identityAccessor,
-            IJwtProvider jwtProvider,
-            IPasswordHasher passwordHasher)
+            IAccessService accessService,
+            ITokenService tokenService)
         {
-            _authorizationRepository = authorizationRepository;
-            _cookieProvider = cookieProvider;
-            _sendInternalRequest = sendInternalRequest;
-            _identityAccessor = identityAccessor;
-            _jwtProvider = jwtProvider;
+            _logger = logger;
+            _userRepository = userRepository;
             _passwordHasher = passwordHasher;
+            _sendInternalRequest = sendInternalRequest;
+            _accessService = accessService;
+            _tokenService = tokenService;
         }
 
-        public async Task<ServiceResponse<AuthorizationUserDTO>> LoginAsync(UserLoginModel loginModel)
+        public async Task<ServiceResponse<UserResponseDTO>> LoginAsync(UserLoginModel loginModel)
         {
+            _logger.LogInformation("Початок роботи логування");
+
             try
             {
-                var getUser = await _authorizationRepository.GetUserByEmailAsync(loginModel.Email);
+                // 1. Перевірка на існування користувача
+                var existingUser = await _userRepository.GetUserByEmailAsync(loginModel.Email);
 
-                if (getUser.StatusCode != StatusCode.General.Ok)
+                if(existingUser.StatusCode != StatusCode.General.Ok)
                 {
-                    return new ServiceResponse<AuthorizationUserDTO>()
+                    _logger.LogWarning("Користувача {Email} не знайдено, або виникла помилка. Код помилки {StatusCode}", loginModel.Email, existingUser.StatusCode);
+
+                    return new ServiceResponse<UserResponseDTO>()
                     {
                         IsSuccess = false,
-                        StatusCode = getUser.StatusCode,
-                        Message = getUser.Message,
+                        StatusCode = existingUser.StatusCode,
+                        Message = existingUser.Message,
                     };
                 }
 
+                // 2. Перевірка паролю
                 bool isPasswordCorrect = await _passwordHasher.VerifyPasswordAsync(
                     loginModel.Password,
-                    getUser.Data.PasswordSalt,
-                    getUser.Data.PasswordHash);
+                    existingUser.Data.PasswordSalt,
+                    existingUser.Data.PasswordHash);
 
-                if (!isPasswordCorrect)
+                if(!isPasswordCorrect)
                 {
-                    return new ServiceResponse<AuthorizationUserDTO>()
+                    _logger.LogInformation("Невірний логін або пароль!");
+
+                    return new ServiceResponse<UserResponseDTO>()
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.Auth.Unauthorized,
@@ -68,11 +76,11 @@ namespace Authorization.Application.Services
                     };
                 }
 
-                var isAcces = CheckUserAccess(getUser.Data);
+                var isAcces = await _accessService.CheckUserAccess(existingUser.Data);
 
-                if(!isAcces.IsSuccess)
+                if (!isAcces.IsSuccess)
                 {
-                    return new ServiceResponse<AuthorizationUserDTO>()
+                    return new ServiceResponse<UserResponseDTO>()
                     {
                         IsSuccess = isAcces.IsSuccess,
                         StatusCode = isAcces.StatusCode,
@@ -80,74 +88,93 @@ namespace Authorization.Application.Services
                     };
                 }
 
-                return await CreateUserSessionAsync(getUser.Data);
+                return await _tokenService.CreateUserSessionAsync(existingUser.Data);
             }
             catch (Exception ex)
             {
-                return new ServiceResponse<AuthorizationUserDTO>
+                _logger.LogCritical(ex, "Сталась помилка серверу!");
+
+                return new ServiceResponse<UserResponseDTO>
                 {
                     IsSuccess = false,
                     StatusCode = StatusCode.General.InternalError,
-                    Message = ex.Message,
+                    Message = "Критична помилка серверу!"
                 };
             }
         }
 
-        public async Task<ServiceResponse<AuthorizationUserDTO>> RegistrationAsync(UserRegisterModel registrationModel)
+        public async Task<ServiceResponse<UserResponseDTO>> RegisterAsync(UserRegisterModel registerModel)
         {
+            _logger.LogInformation("Початок роботи сервісу реєстрації.");
+
             try
             {
-                // 1. Перевірка на існування
-                var getUser = await _authorizationRepository.GetUserByEmailAsync(registrationModel.Email);
+                // 1. Перевірка на існування користувача
+                var existingUser = await _userRepository.GetUserByEmailAsync(registerModel.Email);
 
-                if (getUser.StatusCode != StatusCode.General.NotFound)
+                if(existingUser.StatusCode != StatusCode.General.NotFound)
                 {
-                    return new ServiceResponse<AuthorizationUserDTO>
+                    _logger.LogWarning("Користувач з такою поштою {Email} не можу зареєструватися. Код помилки {StatusCode}", registerModel.Email, existingUser.StatusCode);
+
+                    return new ServiceResponse<UserResponseDTO>()
                     {
                         IsSuccess = false,
-                        StatusCode = getUser.StatusCode,
-                        Message = getUser.Message,
+                        StatusCode = existingUser.StatusCode,
+                        Message = existingUser.Message,
                     };
                 }
 
                 // 2. Створення сутності
-                var newUser = await CreateNewUserEntityAsync(registrationModel);
+                var newUser = await CreateNewUserEntityAsync(registerModel);
 
-                // 3. Збереження в Authorization базі
-                var registerUser = await _authorizationRepository.CreateAsync(newUser);
+                // 3. Збереження в базу
+                _logger.LogInformation("Збереження користувача в базу!");
 
-                if (registerUser.StatusCode != StatusCode.Create.Created)
+                var creationResult = await _userRepository.CreateAsync(newUser);
+
+                if(creationResult.StatusCode != StatusCode.Create.Created)
                 {
-                    return new ServiceResponse<AuthorizationUserDTO>
+                    _logger.LogWarning("Помилка при збереженні користувача в базі даних. Код помилки {StatusCode}. Текст помилки : {Message}",
+                        creationResult.StatusCode, creationResult.Message);
+
+                    return new ServiceResponse<UserResponseDTO>()
                     {
                         IsSuccess = false,
-                        StatusCode = registerUser.StatusCode,
-                        Message = registerUser.Message,
+                        Message = creationResult.Message,
+                        StatusCode= creationResult.StatusCode
                     };
                 }
 
-                // 4. Створюємо опис запиту на ProfileService
-                var profileRequest = new InternalRequest<object>
+                // 4. HTTP виклик до ProfileService
+                _logger.LogInformation("Виклик сервісу профілів!");
+
+                var profileRequest = new InternalRequest<ProfileCreateIntegrationDTO>
                 {
                     ClientName = "ProfileClient",
                     Endpoint = "api/profile/create",
                     Method = HttpMethod.Post,
-                    Body = new { newUser.UserId, newUser.Email }
+                    Body = new ProfileCreateIntegrationDTO()
+                    {
+                        UserId = creationResult.Data.UserId,
+                        Email = creationResult.Data.Email
+                    }
                 };
 
                 try
                 {
-                    var responseProfile = await _sendInternalRequest.SendAsync<object, Guid>(profileRequest);
+                    var responseProfile = await _sendInternalRequest.SendAsync<ProfileCreateIntegrationDTO, Guid>(profileRequest);
 
                     if (!responseProfile.IsSuccess)
                     {
                         // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
-                        await _authorizationRepository.DeleteAsync(newUser.UserId);
+                        await RollbackUserRegistrationAsync(newUser.UserId, responseProfile.Message);
 
-                        return new ServiceResponse<AuthorizationUserDTO>
+                        _logger.LogError("Помилка сервісу профілів. Код помилки {StatusCOde}", responseProfile.StatusCode);
+
+                        return new ServiceResponse<UserResponseDTO>()
                         {
                             IsSuccess = false,
-                            StatusCode = (int)responseProfile.StatusCode,
+                            StatusCode = responseProfile.StatusCode,
                             Message = responseProfile?.Message ?? "Сервіс профілів повернув помилку"
                         };
                     }
@@ -155,215 +182,134 @@ namespace Authorization.Application.Services
                 catch (Exception ex)
                 {
                     // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
-                    await _authorizationRepository.DeleteAsync(newUser.UserId);
+                    await RollbackUserRegistrationAsync(newUser.UserId, ex.Message);
 
-                    return new ServiceResponse<AuthorizationUserDTO>
+                    _logger.LogError("Помилка сервісу профілів. Текст помилки: {ex}", ex.Message);
+
+                    return new ServiceResponse<UserResponseDTO>()
                     {
                         IsSuccess = false,
-                        Message = "Помилка зв'язку з сервісом профілів." + ex.Message,
+                        StatusCode = StatusCode.General.InternalError,
+                        Message = "Помилка зв'язку з сервісом профілів.",
                     };
                 }
 
                 // 5. HTTP виклик до NotificationService
-                var notificationRequest = new InternalRequest<object>
+                var notificationRequest = new InternalRequest<NotificationCreateIntegrationDTO>
                 {
                     ClientName = "NotificationClient",
                     Endpoint = "api/notification/send",
                     Method = HttpMethod.Post,
-                    Body = new
-                        {
-                            IdUser = newUser.UserId,
-                            Destination = newUser.Email,
-                            Channel = "Email",
-                            TemplateName = "Registration",
-                            TemplateData = new Dictionary<string, string>
+                    Body = new NotificationCreateIntegrationDTO()
+                    {
+                        IdUser = newUser.UserId,
+                        Recipient = newUser.Email,
+                        Channel = "Email",
+                        TemplateName = "Registration",
+                        TemplateData = new Dictionary<string, string>
                             {
                                 { "UserName", newUser.Email },
                                 { "AppName", "Movie Opinions" }
                             }
-                        }
+                    }
                 };
 
-                var responseNotification = await _sendInternalRequest.SendAsync<object, object>(notificationRequest);
+                bool isNotificationSent = false;
 
-                var tokenModel = new UserTokenModel()
+                try
                 {
-                    UserId = registerUser.Data.UserId,
-                    Email = registerUser.Data.Email,
-                    IsEmailConfirmed = registerUser.Data.IsEmailConfirmed
-                };
+                    var responseNotification = await _sendInternalRequest.SendAsync<NotificationCreateIntegrationDTO, object>(notificationRequest);
 
-                var createUserSessionAsync = await CreateUserSessionAsync(newUser);
+                    if (responseNotification.IsSuccess)
+                    {
+                        isNotificationSent = true;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("NotificationService повернув помилку: {Msg}", responseNotification.Message);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "NotificationService недоступний (Offline).");
+                }
 
-                return new ServiceResponse<AuthorizationUserDTO>
+                var sessionResult = await _tokenService.CreateUserSessionAsync(newUser);
+
+                if (!sessionResult.IsSuccess)
+                {
+                    _logger.LogError("Помилка реєстрації!");
+
+                    return new ServiceResponse<UserResponseDTO>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = sessionResult.StatusCode,
+                        Message = sessionResult.Message
+                    };
+                }
+
+                return new ServiceResponse<UserResponseDTO>()
                 {
                     IsSuccess = true,
                     StatusCode = StatusCode.General.Ok,
-                    Data = createUserSessionAsync.Data,
-                    Message = responseNotification.IsSuccess
+                    Data = sessionResult.Data,
+                    Message = isNotificationSent
                         ? "Реєстрація успішна! Перевірте вашу пошту для підтвердження."
-                        : "Реєстрація успішна! Але виникла проблема з відправкою листа. Надішліть його повторно в налаштуваннях."       
+                        : "Реєстрація успішна! Але виникла проблема з відправкою листа. Надішліть його повторно в налаштуваннях."
                 };
             }
             catch (Exception ex)
             {
-                return new ServiceResponse<AuthorizationUserDTO>
+                _logger.LogError(ex, "Критична помилка сервісу!");
+
+                return new ServiceResponse<UserResponseDTO>
                 {
                     IsSuccess = false,
                     StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка!" + ex.Message,
+                    Message = "Критична помилка!"
                 };
             }
         }
 
         public async Task<ServiceResponse<bool>> LogoutAsync()
         {
-            _cookieProvider.ClearAuthCookies();
-
-            return new ServiceResponse<bool>
-            {
-                IsSuccess = true,
-                StatusCode = StatusCode.General.Ok,
-                Message = "Вихід успішний",
-                Data = true
-            };
-        }
-
-        public async Task<ServiceResponse<AuthorizationUserDTO>> RefreshTokenAsync()
-        {
-            // 1. Отримуємо дані
-            var userId = _identityAccessor.UserId;
-            var refreshToken = _identityAccessor.RefreshToken;
-
-            if (userId == null || string.IsNullOrEmpty(refreshToken))
-                return new ServiceResponse<AuthorizationUserDTO> { IsSuccess = false, Message = "Сесія втрачена" };
-
-            // 2. Шукаємо токен у базі
-            var userToken = await _authorizationRepository.GetTokenAsync(refreshToken, userId.Value);
-
-            // 3. Перевіряємо валідність
-            if (userToken.Data == null || userToken.Data.RefreshTokenExpiration <= DateTime.UtcNow)
-            {
-                return new ServiceResponse<AuthorizationUserDTO> { IsSuccess = false, Message = "Сесія прострочена" };
-            }
-
-            // 4. Шукаємо самого юзера, щоб створити йому нову сесію
-            var user = await _authorizationRepository.GetUserByIdAsync(userId.Value);
-
-            return await CreateUserSessionAsync(user.Data);
-        }
-
-        public async Task<ServiceResponse<AuthorizationUserDTO>> ChangePasswordAsync()
-        {
             try
             {
-                return new ServiceResponse<AuthorizationUserDTO>
+                await _tokenService.ClearCookies();
+
+                return new ServiceResponse<bool>()
                 {
-                    IsSuccess = false,
+                    IsSuccess = true,
+                    StatusCode = StatusCode.General.Ok,
+                    Message = "Вихід успішний!",
+                    Data = true
                 };
             }
             catch (Exception ex)
             {
-                return new ServiceResponse<AuthorizationUserDTO>
+                _logger.LogError(ex, "Помилка при виході");
+
+                return new ServiceResponse<bool>()
                 {
                     IsSuccess = false,
                     StatusCode = StatusCode.General.InternalError,
-                    Message = ex.Message,
+                    Message = "Помилка системи при спробі виходу!",
+                    Data = false
                 };
             }
         }
 
-        private async Task<ServiceResponse<AuthorizationUserDTO>> CreateUserSessionAsync(User user)
+        private async Task<User> CreateNewUserEntityAsync(UserRegisterModel userRegisterModel)
         {
-            // 1. Готуємо модель для JWT
-            var tokenModel = new UserTokenModel()
-            {
-                UserId = user.UserId,
-                Email = user.Email,
-                IsEmailConfirmed = user.IsEmailConfirmed,
-            };
+            _logger.LogInformation("Створення сутності користувача");
 
-            // 2. Генеруємо токени
-            var accessToken = _jwtProvider.GenerateAccessToken(tokenModel);
-            var refreshToken = _jwtProvider.GenerateRefreshToken();
-
-            _cookieProvider.SetAuthCookies(accessToken, refreshToken);
-
-            // 3. Формуємо сутність для БД
-            var userToken = new UserTokenEntity()
-            {
-                IdToken = Guid.NewGuid(),
-                IdUser = user.UserId,
-                RefreshToken = refreshToken,
-                RefreshTokenExpiration = DateTime.UtcNow.AddDays(7),
-                CreatedAt = DateTime.UtcNow,
-            };
-
-            // Додати видалення інших токенів користувача
-            var saveResult = await _authorizationRepository.CreateTokenAsync(userToken);
-
-            if (!saveResult.IsSuccess)
-            {
-                return new ServiceResponse<AuthorizationUserDTO>
-                {
-                    IsSuccess = false,
-                    StatusCode = saveResult.StatusCode,
-                    Message = "Помилка при збереженні сесії."
-                };
-            }
-
-            // 4. Повертаємо готовий DTO
-            return new ServiceResponse<AuthorizationUserDTO>
-            {
-                IsSuccess = true,
-                StatusCode = StatusCode.General.Ok,
-                Data = new AuthorizationUserDTO
-                {
-                    UserId = user.UserId
-                },
-                Message = "Вхід успішний!"
-            };
-        }
-
-        private ServiceResponse<AuthorizationUserDTO> CheckUserAccess(User userResponse)
-        {
-            if (userResponse.IsBlocked)
-            {
-                return new ServiceResponse<AuthorizationUserDTO>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.Auth.Locked,
-                    Message = "Користувача заблоковано!"
-                };
-            }
-
-            if (userResponse.IsDeleted)
-            {
-                return new ServiceResponse<AuthorizationUserDTO>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.NotFound,
-                    Message = "Користувач видалений!"
-                };
-            }
-
-            return new ServiceResponse<AuthorizationUserDTO>
-            {
-                IsSuccess = true,
-                StatusCode = StatusCode.General.Ok,
-                Message = "Дійсний користувач!"
-            };
-        }
-
-        private async Task<User> CreateNewUserEntityAsync(UserRegisterModel registrationModel)
-        {
             string passwordSalt = Guid.NewGuid().ToString();
-            string encryptionPassword = await _passwordHasher.HashPasswordAsync(registrationModel.Password, passwordSalt);
+            string encryptionPassword = await _passwordHasher.HashPasswordAsync(userRegisterModel.Password, passwordSalt);
 
             return new User()
             {
                 UserId = Guid.NewGuid(),
-                Email = registrationModel.Email,
+                Email = userRegisterModel.Email,
                 PasswordHash = encryptionPassword,
                 PasswordSalt = passwordSalt,
                 Role = Role.User,
@@ -372,6 +318,24 @@ namespace Authorization.Application.Services
                 IsBlocked = false,
                 IsDeleted = false,
             };
+        }
+
+        private async Task RollbackUserRegistrationAsync(Guid idUser, string originalError)
+        {
+            _logger.LogWarning("Запуск відкату: Видалення користувача {UserId} через помилку: {Reason}", idUser, originalError);
+
+            var deleteResult = await _userRepository.DeleteAsync(idUser);
+
+            if (!deleteResult.IsSuccess)
+            {
+                _logger.LogCritical("КРИТИЧНО: Не вдалося видалити юзера {UserId} під час відкату! Статус: {Status}. Помилка: {Msg}",
+                    idUser, deleteResult.StatusCode, deleteResult.Message);
+            }
+            else
+            {
+                _logger.LogInformation("Відкат завершено. Користувач {Email} (ID: {Id}) видалений.",
+                    deleteResult.Data?.Email, idUser);
+            }
         }
     }
 }

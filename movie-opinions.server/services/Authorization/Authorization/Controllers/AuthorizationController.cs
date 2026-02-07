@@ -1,7 +1,7 @@
-﻿using Authorization.Application.Interfaces;
-using Authorization.Models.User;
+﻿using Authorization.Application.Interfaces.Services;
+using Authorization.Domain.Request;
 using Microsoft.AspNetCore.Mvc;
-using AspNetAuth = Microsoft.AspNetCore.Authorization;
+using System.Reflection;
 using Status = MovieOpinions.Contracts.Models.StatusCode;
 
 namespace Authorization.Controllers
@@ -11,30 +11,40 @@ namespace Authorization.Controllers
     public class AuthorizationController : ControllerBase
     {
         private readonly IAuthorizationService _authorizationService;
+        private readonly ILogger<AuthorizationController> _logger;
 
-        public AuthorizationController(IAuthorizationService authorizationService)
+        public AuthorizationController(IAuthorizationService authorizationService, ILogger<AuthorizationController> logger)
         {
             _authorizationService = authorizationService;
+            _logger = logger;
         }
 
-        [HttpPost("register")]
+        [HttpPost("registration")]
         public async Task<IActionResult> Register([FromBody] UserRegisterModel model)
         {
+            _logger.LogInformation("Спроба створити користувача з Email: {Email}", model.Email);
+
             try
             {
-                var result = await _authorizationService.RegistrationAsync(model);
+                var registerUser = await _authorizationService.RegisterAsync(model);
 
-                if (!result.IsSuccess)
+                if (!registerUser.IsSuccess)
                 {
-                    return result.StatusCode == Status.Create.Conflict
-                        ? Conflict(result)
-                        : BadRequest(result);
+                    _logger.LogWarning("Користувач {Email} не зареєстрований. Виникла помилка з кодом {StatusCode}.", model.Email, registerUser.StatusCode);
+
+                    return registerUser.StatusCode == Status.Create.Conflict
+                        ? Conflict(registerUser)
+                        : BadRequest(registerUser);
                 }
 
-                return Ok(result);
+                _logger.LogInformation("Користувач {Email} зареєстрований", model.Email);
+
+                return Ok(registerUser);
             }
             catch (Exception ex)
             {
+                _logger.LogError("Під час реєстрації сталася внутрішня помилка! {ex}", ex);
+
                 return StatusCode(500, "Під час реєстрації сталася внутрішня помилка!");
             }
         }
@@ -42,67 +52,63 @@ namespace Authorization.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] UserLoginModel model)
         {
+            _logger.LogInformation("Спроба входу на сайт користувача {Email}", model.Email);
+
             try
             {
-                var result = await _authorizationService.LoginAsync(model);
+                var loginUser = await _authorizationService.LoginAsync(model);
 
-                if (!result.IsSuccess)
+                if (!loginUser.IsSuccess)
                 {
-                    return (int)result.StatusCode switch
+                    _logger.LogWarning("Сталася помилка при авторизації користувача!");
+
+                    return (int)loginUser.StatusCode switch
                     {
-                        Status.Auth.Unauthorized => Unauthorized(result),
-                        Status.Auth.Locked => StatusCode(423, result),
-                        Status.Verification.Expired => StatusCode(410, result),
-                        _ => BadRequest(result)
+                        Status.Auth.Unauthorized => Unauthorized(loginUser),
+                        Status.Auth.Locked => StatusCode(423, loginUser),
+                        Status.Verification.Expired => StatusCode(410, loginUser),
+                        _ => BadRequest(loginUser)
                     };
                 }
 
-                return Ok(result);
+                _logger.LogInformation("Вхід успішний!");
+
+                return Ok(loginUser);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Під час входу сталася внутрішня помилка!");
+                _logger.LogError("Під час авторизації сталася внутрішня помилка! {ex}", ex);
+
+                return StatusCode(500, "Під час авторизації сталася внутрішня помилка!");
             }
         }
 
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
-            var result = await _authorizationService.LogoutAsync();
-            return Ok(result);
-        }
+            _logger.LogInformation("Спроба входу на сайт користувача!");
 
-        [HttpPost("refresh")]
-        public async Task<IActionResult> Refresh()
-        {
-            var result = await _authorizationService.RefreshTokenAsync();
-
-            if (!result.IsSuccess)
-                return Unauthorized(result);
-
-            return Ok(result);
-        }
-
-        [AspNetAuth.Authorize]
-        [HttpPost("change-password")]
-        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordModel model)
-        {
             try
             {
-                var change = await _authorizationService.ChangePasswordAsync();
+                var logoutUser = await _authorizationService.LogoutAsync();
 
-                if (!change.IsSuccess)
+                if (!logoutUser.IsSuccess)
                 {
-                    return change.StatusCode == Status.Create.Conflict
-                        ? Conflict(change)
-                        : BadRequest(change);
+                    _logger.LogWarning("Сталася помилка при виході користувача!");
+
+                    // Додати точні помилки 
+                    return BadRequest(logoutUser);
                 }
 
-                return Ok(change);
+                _logger.LogInformation("Вихід успішний!");
+
+                return Ok(logoutUser);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Під час зміни паролю сталась внутрішня помилка!");
+                _logger.LogError("Під час виходу з системи сталася внутрішня помилка! {ex}", ex);
+
+                return StatusCode(500, "Під час виходу з системи сталася внутрішня помилка!");
             }
         }
     }

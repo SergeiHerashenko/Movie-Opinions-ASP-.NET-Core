@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using Authorization.Application.Interfaces.Security;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace Authorization.Infrastructure.Cryptography
@@ -9,7 +10,6 @@ namespace Authorization.Infrastructure.Cryptography
         {
             byte[] passwordBytes = Encoding.UTF8.GetBytes(password + salt);
 
-            // Task.Run тут доречний, бо ComputeHash — це CPU-bound операція
             byte[] hashBytes = await Task.Run(() => SHA256.Create().ComputeHash(passwordBytes));
 
             return Convert.ToBase64String(hashBytes);
