@@ -21,10 +21,10 @@ namespace Authorization.DAL.Repositories
 
         public async Task<RepositoryResponse<User>> CreateAsync(User entity)
         {
+            _logger.LogInformation("Підключення до бази даних!");
+
             await using (var conn = new NpgsqlConnection(_dbConnection.GetConnectionString()))
             {
-                _logger.LogInformation("Підключення до бази даних!");
-
                 try
                 {
                     await conn.OpenAsync();
@@ -65,7 +65,7 @@ namespace Authorization.DAL.Repositories
                         }
                     }
 
-                    _logger.LogError("Сталась помилка запису!");
+                    _logger.LogCritical("Сталась помилка запису!");
 
                     return new RepositoryResponse<User>()
                     {
@@ -76,7 +76,7 @@ namespace Authorization.DAL.Repositories
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Критична помилка баз даних!");
+                    _logger.LogCritical(ex, "Критична помилка баз даних!");
 
                     return new RepositoryResponse<User>()
                     {
@@ -166,17 +166,73 @@ namespace Authorization.DAL.Repositories
             }
         }
 
-        public Task<RepositoryResponse<User>> DeleteAsync(Guid id)
+        public async Task<RepositoryResponse<User>> DeleteAsync(Guid id)
         {
-            throw new NotImplementedException();
+            _logger.LogInformation("Початок видалення користувача!");
+
+            await using (var conn = new NpgsqlConnection(_dbConnection.GetConnectionString()))
+            {
+                try
+                {
+                    await conn.OpenAsync();
+
+                    await using (var deletedUser = new NpgsqlCommand(
+                        "DELETE FROM " +
+                            "Users " +
+                        "WHERE " +
+                            "user_id = @IdUser " +
+                        "RETURNING *", conn))
+                    {
+                        deletedUser.Parameters.AddWithValue("@IdUser", id);
+
+                        await using (var readerInformationUser = await deletedUser.ExecuteReaderAsync())
+                        {
+                            if (await readerInformationUser.ReadAsync())
+                            {
+                                var userEntity = MapReaderToUser(readerInformationUser);
+
+                                _logger.LogInformation("Користувача видалено!");
+
+                                return new RepositoryResponse<User>()
+                                {
+                                    IsSuccess = true,
+                                    StatusCode = StatusCode.General.Ok,
+                                    Message = "Користувача видалено!",
+                                    Data = userEntity
+                                };
+                            }
+                        }
+                    }
+
+                    _logger.LogInformation("Користувача не знайдено, видалення не можливе");
+
+                    return new RepositoryResponse<User>
+                    {
+                        IsSuccess = false,
+                        StatusCode = StatusCode.General.NotFound,
+                        Message = "Користувача не знайдено, видалення неможливе."
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCritical(ex, "Критична помилка бази даних!");
+
+                    return new RepositoryResponse<User>
+                    {
+                        IsSuccess = false,
+                        StatusCode = StatusCode.General.InternalError,
+                        Message = "Критична помилка!"
+                    };
+                }
+            }
         }
 
         public async Task<RepositoryResponse<User>> GetUserByEmailAsync(string emailUser)
         {
+            _logger.LogInformation("Підключення до бази даних!");
+
             await using (var conn = new NpgsqlConnection(_dbConnection.GetConnectionString()))
             {
-                _logger.LogInformation("Підключення до бази даних!");
-
                 try
                 {
                     await conn.OpenAsync();
@@ -221,7 +277,7 @@ namespace Authorization.DAL.Repositories
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Критична помилка баз даних!");
+                    _logger.LogCritical(ex, "Критична помилка баз даних!");
 
                     return new RepositoryResponse<User>()
                     {
@@ -233,9 +289,66 @@ namespace Authorization.DAL.Repositories
             }
         }
 
-        public Task<RepositoryResponse<User>> GetUserByIdAsync(Guid idUser)
+        public async Task<RepositoryResponse<User>> GetUserByIdAsync(Guid idUser)
         {
-            throw new NotImplementedException();
+            _logger.LogInformation("Підключення до бази даних!");
+
+            await using (var conn = new NpgsqlConnection(_dbConnection.GetConnectionString()))
+            {
+                try
+                {
+                    await conn.OpenAsync();
+
+                    await using (var getUserById = new NpgsqlCommand(
+                        "SELECT " +
+                            "user_id, email, password_hash, password_salt, user_role, created_at, last_login_at, is_email_confirmed, is_blocked, is_deleted " +
+                        "FROM " +
+                            "Users " +
+                        "WHERE " +
+                            "user_id = @IdUser", conn))
+                    {
+                        getUserById.Parameters.AddWithValue("@IdUser", idUser);
+
+                        await using (var readerInformationUser = await getUserById.ExecuteReaderAsync())
+                        {
+                            if (await readerInformationUser.ReadAsync())
+                            {
+                                var userEntity = MapReaderToUser(readerInformationUser);
+
+                                _logger.LogInformation("Користувача знайдено!");
+
+                                return new RepositoryResponse<User>()
+                                {
+                                    IsSuccess = true,
+                                    StatusCode = StatusCode.General.Ok,
+                                    Message = "Користувача знайдено!",
+                                    Data = userEntity
+                                };
+                            }
+                        }
+                    }
+
+                    _logger.LogInformation("Користувача не знайдено");
+
+                    return new RepositoryResponse<User>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = StatusCode.General.NotFound,
+                        Message = "Користувача не знайдено!"
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCritical(ex, "Критична помилка баз даних!");
+
+                    return new RepositoryResponse<User>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = StatusCode.General.InternalError,
+                        Message = "Критична помилка баз даних!"
+                    };
+                }
+            }
         }
 
         private User MapReaderToUser(NpgsqlDataReader reader)
@@ -246,9 +359,11 @@ namespace Authorization.DAL.Repositories
                 Email = reader["email"].ToString(),
                 PasswordHash = reader["password_hash"].ToString(),
                 PasswordSalt = reader["password_salt"].ToString(),
-                Role = (Role)Convert.ToInt32(reader["user_role"]),
+                Role = Enum.Parse<Role>(reader["user_role"].ToString()),
                 CreatedAt = Convert.ToDateTime(reader["created_at"]),
-                LastLoginAt = Convert.ToDateTime(reader["last_login_at"]),
+                LastLoginAt = reader["last_login_at"] == DBNull.Value
+                                ? null
+                                : (DateTime?)Convert.ToDateTime(reader["last_login_at"]),
                 IsEmailConfirmed = Convert.ToBoolean(reader["is_email_confirmed"]),
                 IsBlocked = Convert.ToBoolean(reader["is_blocked"]),
                 IsDeleted = Convert.ToBoolean(reader["is_deleted"]),

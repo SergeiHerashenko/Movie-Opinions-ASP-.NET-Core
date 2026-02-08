@@ -6,6 +6,6 @@ namespace Authorization.DAL.Interface
 {
     public interface IUserTokenRepository : IBaseRepository<UserToken, RepositoryResponse<UserToken>>
     {
-        Task<RepositoryResponse<UserToken>> GetUserTokenAsync();
+        Task<RepositoryResponse<UserToken>> GetUserTokenAsync(string refreshToken);
     }
 }

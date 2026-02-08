@@ -163,14 +163,14 @@ namespace Authorization.Application.Services
                 try
                 {
                     var responseProfile = await _sendInternalRequest.SendAsync<ProfileCreateIntegrationDTO, Guid>(profileRequest);
-
+                
                     if (!responseProfile.IsSuccess)
                     {
                         // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
                         await RollbackUserRegistrationAsync(newUser.UserId, responseProfile.Message);
-
+                
                         _logger.LogError("Помилка сервісу профілів. Код помилки {StatusCOde}", responseProfile.StatusCode);
-
+                
                         return new ServiceResponse<UserResponseDTO>()
                         {
                             IsSuccess = false,
@@ -183,9 +183,9 @@ namespace Authorization.Application.Services
                 {
                     // ROLLBACK: якщо профіль не створився — видаляємо юзера з Auth
                     await RollbackUserRegistrationAsync(newUser.UserId, ex.Message);
-
+                
                     _logger.LogError("Помилка сервісу профілів. Текст помилки: {ex}", ex.Message);
-
+                
                     return new ServiceResponse<UserResponseDTO>()
                     {
                         IsSuccess = false,
@@ -219,7 +219,7 @@ namespace Authorization.Application.Services
                 try
                 {
                     var responseNotification = await _sendInternalRequest.SendAsync<NotificationCreateIntegrationDTO, object>(notificationRequest);
-
+                
                     if (responseNotification.IsSuccess)
                     {
                         isNotificationSent = true;
@@ -275,7 +275,18 @@ namespace Authorization.Application.Services
         {
             try
             {
-                await _tokenService.ClearCookies();
+                var clearToken =  await _tokenService.ClearCookies();
+
+                if(clearToken.IsSuccess != true)
+                {
+                    return new ServiceResponse<bool>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = clearToken.StatusCode,
+                        Message = clearToken.Message,
+                        Data = false
+                    };
+                }
 
                 return new ServiceResponse<bool>()
                 {

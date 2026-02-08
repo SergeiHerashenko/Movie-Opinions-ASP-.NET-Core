@@ -7,5 +7,7 @@ namespace Authorization.DAL.Interface
     public interface IUserDeletionRepository : IBaseRepository<UserDeletion, RepositoryResponse<UserDeletion>>
     {
         Task<RepositoryResponse<UserDeletion>> GetUserDeletionsByIdAsync(Guid idUser);
+
+        Task<RepositoryResponse<UserDeletion>> GetUserDeletionsByEmailAsync(string emailUser);
     }
 }

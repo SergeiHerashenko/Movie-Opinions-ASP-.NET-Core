@@ -8,6 +8,6 @@ namespace Authorization.Application.Interfaces.Services
     {
         Task<ServiceResponse<UserResponseDTO>> CreateUserSessionAsync(User user);
 
-        Task ClearCookies();
+        Task<ServiceResponse<UserResponseDTO>> ClearCookies();
     }
 }

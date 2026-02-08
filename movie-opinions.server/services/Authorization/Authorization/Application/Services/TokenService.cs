@@ -88,17 +88,53 @@ namespace Authorization.Application.Services
             };
         }
 
-        public async Task ClearCookies()
+        public async Task<ServiceResponse<UserResponseDTO>> ClearCookies()
         {
             var refreshToken = _cookieProvider.GetCookie("X-Refresh-Token");
 
-            // Додати спочатку отримання id токену з бази потім його видалення!
+            var getToken = await _userTokenRepository.GetUserTokenAsync(refreshToken);
+
+            if(getToken.StatusCode != StatusCode.General.Ok)
+            {
+                _logger.LogError("СТалася помилка при отриманні токену");
+
+                _cookieProvider.ClearAuthCookies();
+
+                return new ServiceResponse<UserResponseDTO>()
+                {
+                    IsSuccess = false,
+                    StatusCode = getToken.StatusCode,
+                    Message = getToken.Message
+                };
+            }
+
             if (!string.IsNullOrEmpty(refreshToken))
             {
-                //await _userTokenRepository.DeleteAsync(refreshToken);
+                var deleteToken =  await _userTokenRepository.DeleteAsync(getToken.Data.IdToken);
+
+                if(deleteToken.StatusCode != StatusCode.General.Ok)
+                {
+                    _logger.LogError("СТалася помилка при видалення токену");
+
+                    _cookieProvider.ClearAuthCookies();
+
+                    return new ServiceResponse<UserResponseDTO>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = getToken.StatusCode,
+                        Message = getToken.Message
+                    };
+                }
             }
 
             _cookieProvider.ClearAuthCookies();
+
+            return new ServiceResponse<UserResponseDTO>()
+            {
+                IsSuccess = true,
+                StatusCode = StatusCode.General.Ok,
+                Message = "Токен видалений!"
+            };
         }
     }
 }
