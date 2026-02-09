@@ -25,7 +25,7 @@ namespace Authorization.Application.Services
             _logger = logger;
         }
 
-        public async Task<ServiceResponse<UserResponseDTO>> CheckUserAccess(User entity)
+        public async Task<ServiceResponse> CheckUserAccess(User entity)
         {
             if (entity.IsBlocked)
             {
@@ -35,7 +35,7 @@ namespace Authorization.Application.Services
                 {
                     case StatusCode.General.InternalError:
 
-                        return new ServiceResponse<UserResponseDTO>()
+                        return new ServiceResponse()
                         {
                             IsSuccess = false,
                             StatusCode = StatusCode.General.InternalError,
@@ -46,7 +46,7 @@ namespace Authorization.Application.Services
 
                         if (blockDetails.Data?.ExpiresAt == null)
                         {
-                            return new ServiceResponse<UserResponseDTO>()
+                            return new ServiceResponse()
                             {
                                 IsSuccess = false,
                                 StatusCode = StatusCode.Auth.Locked,
@@ -56,7 +56,7 @@ namespace Authorization.Application.Services
 
                         if (blockDetails.Data?.ExpiresAt > DateTime.UtcNow)
                         {
-                            return new ServiceResponse<UserResponseDTO>()
+                            return new ServiceResponse()
                             {
                                 IsSuccess = false,
                                 StatusCode = StatusCode.Auth.Locked,
@@ -94,7 +94,7 @@ namespace Authorization.Application.Services
                             }
                         });
 
-                        return new ServiceResponse<UserResponseDTO>()
+                        return new ServiceResponse()
                         {
                             IsSuccess = true,
                             StatusCode = StatusCode.General.Ok,
@@ -117,7 +117,7 @@ namespace Authorization.Application.Services
                             }
                         });
 
-                        return new ServiceResponse<UserResponseDTO>()
+                        return new ServiceResponse()
                         {
                             IsSuccess = true,
                             StatusCode = StatusCode.General.Ok,
@@ -133,7 +133,7 @@ namespace Authorization.Application.Services
 
                 if(deletedUser.StatusCode != StatusCode.General.Ok)
                 {
-                    return new ServiceResponse<UserResponseDTO>()
+                    return new ServiceResponse()
                     {
                         IsSuccess = false,
                         StatusCode = StatusCode.General.InternalError,
@@ -143,7 +143,7 @@ namespace Authorization.Application.Services
 
                 _logger.LogInformation("Користувач з логіном {Email} видалено", deletedUser.Data.Email);
 
-                return new ServiceResponse<UserResponseDTO>()
+                return new ServiceResponse()
                 {
                     IsSuccess = false,
                     StatusCode = StatusCode.General.NotFound,
@@ -151,7 +151,7 @@ namespace Authorization.Application.Services
                 };
             }
 
-            return new ServiceResponse<UserResponseDTO>()
+            return new ServiceResponse()
             {
                 IsSuccess = true,
                 StatusCode = StatusCode.General.Ok,

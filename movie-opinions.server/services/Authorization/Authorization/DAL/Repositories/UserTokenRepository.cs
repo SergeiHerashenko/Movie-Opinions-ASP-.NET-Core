@@ -113,7 +113,7 @@ namespace Authorization.DAL.Repositories
                                 return new RepositoryResponse<UserToken>()
                                 {
                                     IsSuccess = true,
-                                    StatusCode = StatusCode.General.Ok,
+                                    StatusCode = StatusCode.Delete.Ok,
                                     Message = "Користувача видалено!",
                                     Data = tokenEntity
                                 };

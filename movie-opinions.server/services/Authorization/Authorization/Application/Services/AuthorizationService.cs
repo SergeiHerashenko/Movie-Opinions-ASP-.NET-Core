@@ -4,6 +4,7 @@ using Authorization.Application.Interfaces.Services;
 using Authorization.DAL.Interface;
 using Authorization.Domain.DTO;
 using Authorization.Domain.Entities;
+using Authorization.Domain.Models;
 using Authorization.Domain.Request;
 using MovieOpinions.Contracts.Enum;
 using MovieOpinions.Contracts.Models;
@@ -88,7 +89,15 @@ namespace Authorization.Application.Services
                     };
                 }
 
-                return await _tokenService.CreateUserSessionAsync(existingUser.Data);
+                var userIdentity = new UserSessionIdentity()
+                {
+                    UserId = existingUser.Data.UserId,
+                    Email = existingUser.Data.Email,
+                    IsEmailConfirmed = existingUser.Data.IsEmailConfirmed,
+                    Role = existingUser.Data.Role
+                };
+
+                return await _tokenService.CreateUserSessionAsync(userIdentity);
             }
             catch (Exception ex)
             {
@@ -234,7 +243,15 @@ namespace Authorization.Application.Services
                     _logger.LogError(ex, "NotificationService недоступний (Offline).");
                 }
 
-                var sessionResult = await _tokenService.CreateUserSessionAsync(newUser);
+                var userIdentity = new UserSessionIdentity()
+                {
+                    UserId = newUser.UserId,
+                    Email = newUser.Email,
+                    IsEmailConfirmed = newUser.IsEmailConfirmed,
+                    Role = newUser.Role
+                };
+
+                var sessionResult = await _tokenService.CreateUserSessionAsync(userIdentity);
 
                 if (!sessionResult.IsSuccess)
                 {
@@ -298,7 +315,7 @@ namespace Authorization.Application.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Помилка при виході");
+                _logger.LogError(ex, "Помилка при виході!");
 
                 return new ServiceResponse<bool>()
                 {
@@ -306,6 +323,81 @@ namespace Authorization.Application.Services
                     StatusCode = StatusCode.General.InternalError,
                     Message = "Помилка системи при спробі виходу!",
                     Data = false
+                };
+            }
+        }
+
+        public async Task<ServiceResponse<UserResponseDTO>> RefreshSessionAsync()
+        {
+            try
+            {
+                var refreshToken = await _tokenService.ValidateAndRevokeTokenAsync();
+
+                if(refreshToken.StatusCode != StatusCode.General.Ok)
+                {
+                    _logger.LogWarning("Помилка валідації токену: {Message}", refreshToken.Message);
+
+                    return new ServiceResponse<UserResponseDTO>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = refreshToken.StatusCode,
+                        Message = refreshToken.Message,
+                    };
+                }
+
+                var informationUser = await _userRepository.GetUserByIdAsync(refreshToken.Data);
+
+                if(informationUser.StatusCode != StatusCode.General.Ok)
+                {
+                    _logger.LogInformation("Помилка читання користувача із бази");
+
+                    return new ServiceResponse<UserResponseDTO>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = informationUser.StatusCode,
+                        Message = informationUser.Message,
+                    };
+                }
+
+                var userIdentity = new UserSessionIdentity()
+                {
+                    UserId = informationUser.Data.UserId,
+                    Email = informationUser.Data.Email,
+                    IsEmailConfirmed = informationUser.Data.IsEmailConfirmed,
+                    Role = informationUser.Data.Role
+                };
+
+                var sessionResult = await _tokenService.CreateUserSessionAsync(userIdentity);
+
+                if (!sessionResult.IsSuccess)
+                {
+                    _logger.LogError("Помилка отримання нового токену!");
+
+                    return new ServiceResponse<UserResponseDTO>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = sessionResult.StatusCode,
+                        Message = sessionResult.Message
+                    };
+                }
+
+                return new ServiceResponse<UserResponseDTO>()
+                {
+                    IsSuccess = true,
+                    StatusCode = StatusCode.General.Ok,
+                    Data = sessionResult.Data,
+                    Message = "Токени успішно оновлений!"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Помилка при спробі оновити сесію користувача!");
+
+                return new ServiceResponse<UserResponseDTO>()
+                {
+                    IsSuccess = false,
+                    StatusCode = StatusCode.General.InternalError,
+                    Message = "Помилка системи при спробі оновити токен користувача!"
                 };
             }
         }

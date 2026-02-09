@@ -7,7 +7,7 @@ using Status = MovieOpinions.Contracts.Models.StatusCode;
 namespace Authorization.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/auth")]
     public class AuthorizationController : ControllerBase
     {
         private readonly IAuthorizationService _authorizationService;
@@ -103,6 +103,32 @@ namespace Authorization.Controllers
                 _logger.LogInformation("Вихід успішний!");
 
                 return Ok(logoutUser);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Під час виходу з системи сталася внутрішня помилка! {ex}", ex);
+
+                return StatusCode(500, "Під час виходу з системи сталася внутрішня помилка!");
+            }
+        }
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> RefreshTokenAsync()
+        {
+            _logger.LogInformation("Спроба оновлення сесії користувача!");
+
+            try
+            {
+                var refreshSession = await _authorizationService.RefreshSessionAsync();
+
+                if (!refreshSession.IsSuccess)
+                {
+                    _logger.LogWarning("Помилка оновлення сесії користувача. Прострочений токен або помилка серверу!");
+
+                    return Unauthorized(refreshSession);
+                }
+
+                return Ok(refreshSession);
             }
             catch (Exception ex)
             {

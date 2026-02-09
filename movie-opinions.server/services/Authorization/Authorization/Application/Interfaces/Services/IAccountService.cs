@@ -1,0 +1,20 @@
+﻿using Authorization.Domain.Request;
+using MovieOpinions.Contracts.Models.ServiceResponse;
+
+namespace Authorization.Application.Interfaces.Services
+{
+    public interface IAccountService
+    {
+        Task<ServiceResponse> InitiatePasswordChangeAsync(ChangePasswordModel model);
+
+        Task<ServiceResponse> ChangePasswordAsync(string code, ChangePasswordModel model);
+
+        Task<ServiceResponse> ForgotPasswordAsync(string userEmail);
+
+        Task<ServiceResponse> ResetPasswordAsunc(string newPassword);
+
+        Task<ServiceResponse> ChangeEmailAsync(ChangeEmailModel model);
+
+        Task<ServiceResponse> SendingConfirmationAsync();
+    }
+}

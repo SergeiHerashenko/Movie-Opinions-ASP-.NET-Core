@@ -72,13 +72,15 @@ internal class Program
             builder.Services.AddScoped<IUserTokenRepository, UserTokenRepository>();
 
             builder.Services.AddScoped<IAuthorizationService, AuthorizationService>();
+            builder.Services.AddScoped<IAccessService, AccessService>();
             builder.Services.AddScoped<ITokenService, TokenService>();
+            builder.Services.AddScoped<IAccountService, AccountService>();
+
             builder.Services.AddScoped<ISendInternalRequest, SendInternalRequest>();
             builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
             builder.Services.AddScoped<IJwtProvider, JwtProvider>();
             builder.Services.AddScoped<ICookieProvider, CookieProvider>();
-            builder.Services.AddScoped<IAccessService, AccessService>();
-
+            
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();

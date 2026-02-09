@@ -6,6 +6,6 @@ namespace Authorization.Application.Interfaces.Services
 {
     public interface IAccessService
     {
-        Task<ServiceResponse<UserResponseDTO>> CheckUserAccess(User entity);
+        Task<ServiceResponse> CheckUserAccess(User entity);
     }
 }

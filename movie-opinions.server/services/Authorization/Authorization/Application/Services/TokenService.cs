@@ -28,7 +28,7 @@ namespace Authorization.Application.Services
             _userTokenRepository = userTokenRepository;
         }
 
-        public async Task<ServiceResponse<UserResponseDTO>> CreateUserSessionAsync(User user)
+        public async Task<ServiceResponse<UserResponseDTO>> CreateUserSessionAsync(UserSessionIdentity user)
         {
             _logger.LogInformation("Формування JWT токену!");
 
@@ -88,7 +88,7 @@ namespace Authorization.Application.Services
             };
         }
 
-        public async Task<ServiceResponse<UserResponseDTO>> ClearCookies()
+        public async Task<ServiceResponse> ClearCookies()
         {
             var refreshToken = _cookieProvider.GetCookie("X-Refresh-Token");
 
@@ -100,7 +100,7 @@ namespace Authorization.Application.Services
 
                 _cookieProvider.ClearAuthCookies();
 
-                return new ServiceResponse<UserResponseDTO>()
+                return new ServiceResponse<bool>()
                 {
                     IsSuccess = false,
                     StatusCode = getToken.StatusCode,
@@ -114,11 +114,11 @@ namespace Authorization.Application.Services
 
                 if(deleteToken.StatusCode != StatusCode.General.Ok)
                 {
-                    _logger.LogError("СТалася помилка при видалення токену");
+                    _logger.LogError("Сталася помилка при видалення токену");
 
                     _cookieProvider.ClearAuthCookies();
 
-                    return new ServiceResponse<UserResponseDTO>()
+                    return new ServiceResponse<bool>()
                     {
                         IsSuccess = false,
                         StatusCode = getToken.StatusCode,
@@ -129,11 +129,86 @@ namespace Authorization.Application.Services
 
             _cookieProvider.ClearAuthCookies();
 
-            return new ServiceResponse<UserResponseDTO>()
+            return new ServiceResponse<bool>()
             {
                 IsSuccess = true,
                 StatusCode = StatusCode.General.Ok,
                 Message = "Токен видалений!"
+            };
+        }
+
+        public async Task<ServiceResponse<Guid>> ValidateAndRevokeTokenAsync()
+        {
+            _logger.LogInformation("Отримання токену користувача");
+
+            var oldRefreshToken = _cookieProvider.GetCookie("X-Refresh-Token");
+
+            if (string.IsNullOrEmpty(oldRefreshToken))
+            {
+                _logger.LogWarning("Токену не знайено в куках файлах!");
+
+                return new ServiceResponse<Guid>()
+                { 
+                    IsSuccess = false, 
+                    StatusCode = StatusCode.Auth.Unauthorized,
+                    Message = "Токену в куках не знайдено!"
+                };
+            }
+
+            var tokenResuld = await _userTokenRepository.GetUserTokenAsync(oldRefreshToken);
+            
+            if( tokenResuld.StatusCode != StatusCode.General.Ok)
+            {
+                _logger.LogWarning("Не знайдено або отримано помилку при пошуку токену!");
+
+                return new ServiceResponse<Guid>()
+                {
+                    IsSuccess = false,
+                    StatusCode = tokenResuld.StatusCode,
+                    Message = tokenResuld.Message
+                };
+            }
+
+            if(tokenResuld.Data.RefreshTokenExpiration < DateTime.UtcNow)
+            {
+                var deleteOldToken = await _userTokenRepository.DeleteAsync(tokenResuld.Data.IdToken);
+
+                if(deleteOldToken.StatusCode != StatusCode.General.Ok)
+                {
+                    return new ServiceResponse<Guid>()
+                    {
+                        IsSuccess = false,
+                        StatusCode = deleteOldToken.StatusCode,
+                        Message = deleteOldToken.Message
+                    };
+                }
+
+                return new ServiceResponse<Guid>()
+                {
+                    IsSuccess = false,
+                    StatusCode = StatusCode.Auth.Unauthorized,
+                    Message = "Дія токену вичерпана!"
+                };
+            }
+
+            var deleteToken = await _userTokenRepository.DeleteAsync(tokenResuld.Data.IdToken);
+
+            if(deleteToken.StatusCode != StatusCode.Delete.Ok)
+            {
+                return new ServiceResponse<Guid>()
+                {
+                    IsSuccess = false,
+                    StatusCode = deleteToken.StatusCode,
+                    Message = deleteToken.Message
+                };
+            }
+
+            return new ServiceResponse<Guid>()
+            {
+                IsSuccess = true,
+                StatusCode = StatusCode.General.Ok,
+                Message = "Токен видалено!",
+                Data = tokenResuld.Data.IdUser
             };
         }
     }

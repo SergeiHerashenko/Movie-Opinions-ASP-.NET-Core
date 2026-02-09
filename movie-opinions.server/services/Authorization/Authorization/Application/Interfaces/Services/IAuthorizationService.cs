@@ -11,5 +11,7 @@ namespace Authorization.Application.Interfaces.Services
         Task<ServiceResponse<UserResponseDTO>> RegisterAsync(UserRegisterModel registerModel);
 
         Task<ServiceResponse<bool>> LogoutAsync();
+
+        Task<ServiceResponse<UserResponseDTO>> RefreshSessionAsync();
     }
 }
