@@ -6,6 +6,8 @@
 
         string GetCookie(string name);
 
+        Guid GetUserId();
+
         void ClearAuthCookies();
     }
 }

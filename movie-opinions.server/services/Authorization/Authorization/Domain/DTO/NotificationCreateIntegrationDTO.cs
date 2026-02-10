@@ -8,8 +8,8 @@
 
         public string Channel { get; set; }
 
-        public string TemplateName { get; set; }
+        public string Action { get; set; }
 
-        public Dictionary<string, string> TemplateData { get; set; }
+        public Dictionary<string, string> Arguments { get; set; }
     }
 }

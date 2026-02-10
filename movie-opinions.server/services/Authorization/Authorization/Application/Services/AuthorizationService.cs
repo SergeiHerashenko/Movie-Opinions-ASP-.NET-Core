@@ -9,6 +9,7 @@ using Authorization.Domain.Request;
 using MovieOpinions.Contracts.Enum;
 using MovieOpinions.Contracts.Models;
 using MovieOpinions.Contracts.Models.ServiceResponse;
+using MovieOpinions.Messaging.Contracts.Models;
 
 namespace Authorization.Application.Services
 {
@@ -154,6 +155,8 @@ namespace Authorization.Application.Services
                     };
                 }
 
+                // Додати виклик до мікросервісу UserContacts для зберігання способу сповіщень користувача
+
                 // 4. HTTP виклик до ProfileService
                 _logger.LogInformation("Виклик сервісу профілів!");
 
@@ -213,9 +216,9 @@ namespace Authorization.Application.Services
                     {
                         IdUser = newUser.UserId,
                         Recipient = newUser.Email,
-                        Channel = "Email",
-                        TemplateName = "Registration",
-                        TemplateData = new Dictionary<string, string>
+                        Channel = MessageChannels.Email,
+                        Action = MessageActions.Registration,
+                        Arguments = new Dictionary<string, string>
                             {
                                 { "UserName", newUser.Email },
                                 { "AppName", "Movie Opinions" }

@@ -1,4 +1,5 @@
 ﻿using Authorization.Application.Interfaces.Cookie;
+using System.Security.Claims;
 
 namespace Authorization.Infrastructure.Cookie
 {
@@ -31,6 +32,18 @@ namespace Authorization.Infrastructure.Cookie
         public string GetCookie(string name)
         {
             return _httpContextAccessor.HttpContext?.Request.Cookies[name];
+        }
+
+        public Guid GetUserId()
+        {
+            var userIdClaim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (Guid.TryParse(userIdClaim, out var userId))
+            {
+                return userId;
+            }
+
+            return Guid.Empty;
         }
 
         public void SetAuthCookies(string accessToken, string refreshToken)

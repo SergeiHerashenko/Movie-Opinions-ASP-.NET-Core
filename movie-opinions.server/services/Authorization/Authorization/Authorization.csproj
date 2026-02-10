@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\contracts\MovieOpinions.Contracts\MovieOpinions.Contracts\MovieOpinions.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\contracts\MovieOpinions.Messaging.Contracts\MovieOpinions.Messaging.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

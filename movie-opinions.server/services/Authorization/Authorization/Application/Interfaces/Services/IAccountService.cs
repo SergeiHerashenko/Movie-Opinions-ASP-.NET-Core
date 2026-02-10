@@ -11,7 +11,7 @@ namespace Authorization.Application.Interfaces.Services
 
         Task<ServiceResponse> ForgotPasswordAsync(string userEmail);
 
-        Task<ServiceResponse> ResetPasswordAsunc(string newPassword);
+        Task<ServiceResponse> ResetPasswordAsync(string newPassword);
 
         Task<ServiceResponse> ChangeEmailAsync(ChangeEmailModel model);
 
