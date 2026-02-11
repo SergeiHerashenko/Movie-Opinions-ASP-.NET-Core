@@ -7,7 +7,7 @@ namespace Authorization.Application.Interfaces.Services
     {
         Task<ServiceResponse<string>> InitiateAccountChange(ChangePasswordModel model);
 
-
+        Task<ServiceResponse> SendingConfirmationAsync(SendVerificationCodeRequest request);
 
 
 
@@ -18,7 +18,5 @@ namespace Authorization.Application.Interfaces.Services
         Task<ServiceResponse> ResetPasswordAsync(string newPassword);
 
         Task<ServiceResponse> ChangeEmailAsync(ChangeEmailModel model);
-
-        Task<ServiceResponse> SendingConfirmationAsync(SendVerificationCodeRequest request);
     }
 }

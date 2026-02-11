@@ -3,13 +3,13 @@
 namespace Contacts.Controllers
 {
     [ApiController]
-    [Route("api/contracts")]
-    public class ContractsController : ControllerBase
+    [Route("api/contacts")]
+    public class ContactsController : ControllerBase
     {
-        [HttpGet("contracts/{contractsId}")]
+        [HttpGet("contacts/{contractsId}")]
         public async Task<IActionResult> GetContact()
         {
-            
+            return Ok();
         }
     }
 }

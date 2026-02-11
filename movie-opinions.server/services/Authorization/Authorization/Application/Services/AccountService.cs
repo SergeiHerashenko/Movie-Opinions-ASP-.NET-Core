@@ -166,6 +166,14 @@ namespace Authorization.Application.Services
                 }
 
                 // Продовжити: Взяти з мікросервісу контактів (емейл телефон ) по ід юзера і відправити все в мікросервіс сповіщень!
+                var contactsRequest = new InternalRequest<object>()
+                {
+                    ClientName = "ContactsClient",
+                    Endpoint = $"api/contacts/contacts/{userId}",
+                    Method = HttpMethod.Get
+                };
+
+                var responseContact = await _sendInternalRequest.SendAsync();
             }
             catch (Exception ex)
             {

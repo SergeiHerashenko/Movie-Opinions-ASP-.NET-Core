@@ -47,7 +47,8 @@ internal class Program
             // Add services to the container.
             var profileServiceUrl = builder.Configuration["ServiceUrls:ProfileService"];
             var notificationServiceUrl = builder.Configuration["ServiceUrls:NotificationService"];
-            if (string.IsNullOrEmpty(profileServiceUrl) || string.IsNullOrEmpty(notificationServiceUrl))
+            var contactsServiceUrl = builder.Configuration["ServiceUrls:ContactsService"];
+            if (string.IsNullOrEmpty(profileServiceUrl) || string.IsNullOrEmpty(notificationServiceUrl) || string.IsNullOrEmpty(contactsServiceUrl))
             {
                 throw new Exception("Критична помилка: Не знайдено URL сервісів у конфігурації!");
             }
@@ -62,6 +63,12 @@ internal class Program
             builder.Services.AddHttpClient("NotificationClient", client =>
             {
                 client.BaseAddress = new Uri(notificationServiceUrl);
+            });
+
+            // Клієнт для контактів
+            builder.Services.AddHttpClient("ContactsClient", client =>
+            {
+                client.BaseAddress = new Uri(contactsServiceUrl);
             });
 
             builder.Services.AddSingleton<IDbConnectionProvider, ConnectAuthorizationDb>();
