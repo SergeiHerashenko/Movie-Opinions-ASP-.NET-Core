@@ -171,7 +171,7 @@ namespace Authorization.Application.Services
                         Email = creationResult.Data.Email
                     }
                 };
-
+                
                 try
                 {
                     var responseProfile = await _sendInternalRequest.SendAsync<ProfileCreateIntegrationDTO, Guid>(profileRequest);
@@ -205,7 +205,7 @@ namespace Authorization.Application.Services
                         Message = "Помилка зв'язку з сервісом профілів.",
                     };
                 }
-
+                
                 // 5. HTTP виклик до NotificationService
                 var notificationRequest = new InternalRequest<NotificationCreateIntegrationDTO>
                 {
@@ -225,9 +225,9 @@ namespace Authorization.Application.Services
                             }
                     }
                 };
-
+                
                 bool isNotificationSent = false;
-
+                
                 try
                 {
                     var responseNotification = await _sendInternalRequest.SendAsync<NotificationCreateIntegrationDTO, object>(notificationRequest);
@@ -245,7 +245,7 @@ namespace Authorization.Application.Services
                 {
                     _logger.LogError(ex, "NotificationService недоступний (Offline).");
                 }
-
+                
                 var userIdentity = new UserSessionIdentity()
                 {
                     UserId = newUser.UserId,
@@ -259,6 +259,8 @@ namespace Authorization.Application.Services
                 if (!sessionResult.IsSuccess)
                 {
                     _logger.LogError("Помилка реєстрації!");
+
+                    await RollbackUserRegistrationAsync(newUser.UserId, sessionResult.Message);
 
                     return new ServiceResponse<UserResponseDTO>()
                     {

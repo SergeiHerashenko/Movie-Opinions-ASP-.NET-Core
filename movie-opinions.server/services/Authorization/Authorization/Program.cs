@@ -70,6 +70,7 @@ internal class Program
             builder.Services.AddScoped<IUserRestrictionRepository, UserRestrictionRepository>();
             builder.Services.AddScoped<IUserDeletionRepository, UserDeletionRepository>();
             builder.Services.AddScoped<IUserTokenRepository, UserTokenRepository>();
+            builder.Services.AddScoped<IUserPendingAccountChangesRepository, UserPendingAccountChangesRepository>();
 
             builder.Services.AddScoped<IAuthorizationService, AuthorizationService>();
             builder.Services.AddScoped<IAccessService, AccessService>();

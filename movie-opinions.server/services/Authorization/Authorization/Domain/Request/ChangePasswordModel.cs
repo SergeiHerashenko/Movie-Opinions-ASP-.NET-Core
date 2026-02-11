@@ -4,8 +4,6 @@ namespace Authorization.Domain.Request
 {
     public class ChangePasswordModel
     {
-        public Guid IdUser { get; set; }
-
         [Required]
         public string OldPassword { get; set; }
 

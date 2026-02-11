@@ -5,7 +5,11 @@ namespace Authorization.Application.Interfaces.Services
 {
     public interface IAccountService
     {
-        Task<ServiceResponse> InitiatePasswordChangeAsync(ChangePasswordModel model);
+        Task<ServiceResponse<string>> InitiateAccountChange(ChangePasswordModel model);
+
+
+
+
 
         Task<ServiceResponse> ChangePasswordAsync(string code, ChangePasswordModel model);
 
@@ -15,6 +19,6 @@ namespace Authorization.Application.Interfaces.Services
 
         Task<ServiceResponse> ChangeEmailAsync(ChangeEmailModel model);
 
-        Task<ServiceResponse> SendingConfirmationAsync();
+        Task<ServiceResponse> SendingConfirmationAsync(SendVerificationCodeRequest request);
     }
 }

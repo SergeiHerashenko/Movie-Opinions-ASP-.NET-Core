@@ -2,6 +2,7 @@
 using Authorization.Domain.Request;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Reflection;
 
 namespace Authorization.Controllers
 {
@@ -20,14 +21,14 @@ namespace Authorization.Controllers
         }
         // Змінити моделі бо одна не підходить для всього Створити окрему модель для підтвердження, щоб не ганяти ChangePasswordModel
         [Authorize]
-        [HttpPost("change-password/request")]
-        public async Task<IActionResult> RequestChange([FromBody] ChangePasswordModel model)
+        [HttpPost("initiate-pass-change")]
+        public async Task<IActionResult> InitiatePasswordChangeAsync ([FromBody] ChangePasswordModel model)
         {
             _logger.LogInformation("Спроба перевірки паролю користувача");
 
             try
             {
-                var changeResponse = await _accountService.InitiatePasswordChangeAsync(model);
+                var changeResponse = await _accountService.InitiateAccountChange(model);
 
                 if (!changeResponse.IsSuccess)
                 {
@@ -49,31 +50,31 @@ namespace Authorization.Controllers
         }
 
         [Authorize]
-        [HttpPost("change-password/confirm")]
-        public async Task<IActionResult> ConfirmChange([FromQuery] string code, [FromBody] ChangePasswordModel model)
+        [HttpPost("send-confirm")]
+        public async Task<IActionResult> SendingConfirmation([FromBody] SendVerificationCodeRequest request)
         {
-            _logger.LogInformation("Спроба зміни паролю користувача");
+            _logger.LogInformation("Спроба відправки листа підтвердження!");
 
             try
             {
-                var changeResponse = await _accountService.ChangePasswordAsync(code, model);
+                var sendResponse = await _accountService.SendingConfirmationAsync(request);
 
-                if (!changeResponse.IsSuccess)
+                if (!sendResponse.IsSuccess)
                 {
-                    _logger.LogWarning("Невірний код підтвердження або помилка серверу!");
+                    _logger.LogWarning("Помилка при відправлені листа підтвердження!");
 
-                    return BadRequest(changeResponse);
+                    return BadRequest(sendResponse);
                 }
 
-                _logger.LogInformation("Зміна паролю успішна!");
+                _logger.LogInformation("Лист підтвердження відправлено!");
 
-                return Ok(changeResponse);
+                return Ok(sendResponse);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Під час зміни паролю сталася внутрішня помилка!");
+                _logger.LogError(ex, "Під час відправки листа підтвердження сталася внутрішня помилка!");
 
-                return StatusCode(500, "Під час зміни паролю сталася внутрішня помилка!");
+                return StatusCode(500, "Під час відправки листа підтвердження сталася внутрішня помилка!");
             }
         }
     }

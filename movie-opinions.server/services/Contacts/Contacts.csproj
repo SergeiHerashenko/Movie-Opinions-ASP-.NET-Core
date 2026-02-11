@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Controllers\" />
+    <ProjectReference Include="..\..\contracts\MovieOpinions.Contracts\MovieOpinions.Contracts\MovieOpinions.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

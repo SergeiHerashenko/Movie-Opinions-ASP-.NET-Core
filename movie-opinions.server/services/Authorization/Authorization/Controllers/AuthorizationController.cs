@@ -1,7 +1,6 @@
 ﻿using Authorization.Application.Interfaces.Services;
 using Authorization.Domain.Request;
 using Microsoft.AspNetCore.Mvc;
-using System.Reflection;
 using Status = MovieOpinions.Contracts.Models.StatusCode;
 
 namespace Authorization.Controllers
