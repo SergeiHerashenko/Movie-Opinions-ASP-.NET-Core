@@ -1,24 +1,25 @@
-﻿using MovieOpinions.Contracts.Enum;
+﻿using Authorization.Domain.Common;
+using MovieOpinions.Contracts.Enum;
 
 namespace Authorization.Domain.Entities
 {
-    public class User
+    public class User : IBaseEntity
     {
-        public Guid UserId { get; set; }
+        public Guid Id { get; set; }
 
-        public string Email { get; set; }
+        public string Login { get; set; }
 
         public string PasswordHash { get; set; }
-
-        public string PasswordSalt { get; set; }
 
         public Role Role { get; set; }
 
         public DateTime CreatedAt { get; set; }
 
+        public DateTime UpdatedAt { get; set; }
+
         public DateTime? LastLoginAt { get; set; }
 
-        public bool IsEmailConfirmed { get; set; }
+        public bool IsConfirmed { get; set; }
 
         public bool IsBlocked { get; set; }
 

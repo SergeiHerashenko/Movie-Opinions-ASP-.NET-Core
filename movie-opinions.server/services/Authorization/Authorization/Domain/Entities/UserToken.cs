@@ -1,10 +1,12 @@
-﻿namespace Authorization.Domain.Entities
-{
-    public class UserToken
-    {
-        public Guid IdToken { get; set; }
+﻿using Authorization.Domain.Common;
 
-        public Guid IdUser { get; set; }
+namespace Authorization.Domain.Entities
+{
+    public class UserToken : IBaseEntity
+    {
+        public Guid Id { get; set; }
+
+        public Guid UserId { get; set; }
 
         public string RefreshToken { get; set; }
 
