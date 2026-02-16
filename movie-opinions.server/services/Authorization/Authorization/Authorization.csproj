@@ -7,18 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.3.1" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Application\DTO\Authentication\Response\" />
-    <Folder Include="Controllers\" />
-    <Folder Include="Infrastructure\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\contracts\MovieOpinions.Contracts\MovieOpinions.Contracts\MovieOpinions.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\contracts\MovieOpinions.Messaging.Contracts\MovieOpinions.Messaging.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\contracts\Contracts\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\Authorization.Application\Authorization.Application.csproj" />
   </ItemGroup>
 
 </Project>

@@ -7,14 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MailKit" Version="4.14.1" />
-    <PackageReference Include="MimeKit" Version="4.14.0" />
-    <PackageReference Include="Npgsql" Version="10.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\contracts\MovieOpinions.Contracts\MovieOpinions.Contracts\MovieOpinions.Contracts.csproj" />
+    <Folder Include="Controllers\" />
   </ItemGroup>
 
 </Project>
