@@ -1,13 +1,12 @@
 ﻿using Authorization.Domain.Entities;
-using Contracts.Interface;
-using Contracts.Models.RepositoryResponse;
+using Contracts.Interfaces;
 
 namespace Authorization.Application.Interfaces.Repositories
 {
-    public interface IUserDeletionRepository : IBaseRepository<UserDeletion, RepositoryResponse<UserDeletion>>
+    public interface IUserDeletionRepository : IBaseRepository<UserDeletion>
     {
-        Task<RepositoryResponse<UserDeletion>> GetUserDeletionsByIdAsync(Guid userId);
+        Task<UserDeletion> GetUserDeletionsByIdAsync(Guid userId);
 
-        Task<RepositoryResponse<UserDeletion>> GetUserDeletionsByLoginAsync(string userLogin);
+        Task<UserDeletion> GetUserDeletionsByLoginAsync(string userLogin);
     }
 }

@@ -1,10 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Authorization.Application.Common.Attributes;
+using System.ComponentModel.DataAnnotations;
 
 namespace Authorization.Application.DTO.Authentication.Request
 {
     public class UserRegistrationDTO
     {
         [Required]
+        [EmailOrPhone]
         public required string Login { get; set; }
 
         [Required]

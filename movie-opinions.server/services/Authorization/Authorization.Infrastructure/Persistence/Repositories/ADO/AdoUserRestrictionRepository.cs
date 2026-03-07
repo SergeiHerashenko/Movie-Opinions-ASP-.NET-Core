@@ -1,32 +1,31 @@
 ﻿using Authorization.Application.Interfaces.Repositories;
 using Authorization.Domain.Entities;
+using Authorization.Domain.Exceptions;
 using Authorization.Infrastructure.Persistence.Context.AdoNet;
-using Contracts.Models.RepositoryResponse;
-using Contracts.Models.Status;
+using Authorization.Infrastructure.Persistence.Repositories.Base;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 {
-    public class AdoUserRestrictionRepository : IUserRestrictionRepository
+    public class AdoUserRestrictionRepository : RepositoryBase, IUserRestrictionRepository
     {
-        private readonly IDbConnectionProvider _connectionProvider;
-        private readonly ILogger<AdoUserRestrictionRepository> _logger;
+        private readonly IDbConnectionProvider _dbconnectionProvider;
 
-        public AdoUserRestrictionRepository(IDbConnectionProvider connectionProvider, 
+        public AdoUserRestrictionRepository(IDbConnectionProvider connectionProvider,
             ILogger<AdoUserRestrictionRepository> logger)
+                : base(logger)
         {
-            _connectionProvider = connectionProvider;
-            _logger = logger;
+            _dbconnectionProvider = connectionProvider;
         }
 
-        public async Task<RepositoryResponse<UserRestriction>> CreateAsync(UserRestriction entity)
+        public async Task<UserRestriction> CreateAsync(UserRestriction entity)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                var sql = $@"
+                var sql = @"
                     INSERT INTO 
                         User_Restrictions (id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active) 
                     VALUES
@@ -51,139 +50,22 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                             _logger.LogInformation("Запис про обмеження користувача {UserId} збережений в базу!", entity.UserId);
 
-                            return new RepositoryResponse<UserRestriction>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.Create.Created,
-                                Data = newRecord,
-                                Message = $"Запис про обмеження користувача {entity.UserId} збережений в базу!"
-                            };
+                            return newRecord;
                         }
                     }
                 }
 
-                _logger.LogWarning("Сталась помилка запису в таблицю!");
-
-                return new RepositoryResponse<UserRestriction>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Сталась помилка запису в таблицю!"
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<UserRestriction>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
-
-                return new RepositoryResponse<UserRestriction>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                throw new Exception("Не вдалося отримати дані після вставки");
+            });
         }
 
-        public async Task<RepositoryResponse<UserRestriction>> UpdateAsync(UserRestriction entity)
+        public async Task<UserRestriction> DeleteAsync(Guid id)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                var sql = $@"
-                    UPDATE 
-                        User_Restrictions 
-                    SET 
-                        user_id = @UserId,
-                        login = @Login,
-                        reason = @Reason,
-                        name_banned_by = @NameBannedBy,
-                        expires_at = @ExpiresAt,
-                        is_active = @IsActive
-                    WHERE 
-                        id = @Id
-                    RETURNING * ";
-
-                await using (var updateRestrictionUserCommand = new NpgsqlCommand(sql, conn))
-                {
-                    updateRestrictionUserCommand.Parameters.AddWithValue("@Id", entity.Id);
-                    updateRestrictionUserCommand.Parameters.AddWithValue("@IdUser", entity.UserId);
-                    updateRestrictionUserCommand.Parameters.AddWithValue("@Login", entity.Login);
-                    updateRestrictionUserCommand.Parameters.AddWithValue("@Reason", entity.Reason ?? (object)DBNull.Value);
-                    updateRestrictionUserCommand.Parameters.AddWithValue("@NameBannedBy", entity.NameBannedBy);
-                    updateRestrictionUserCommand.Parameters.AddWithValue("@ExpiresAt", entity.ExpiresAt ?? (object)DBNull.Value);
-                    updateRestrictionUserCommand.Parameters.AddWithValue("@IsActive", entity.IsActive);
-
-                    await using (var readerUpdateRestrictionUserCommand = await updateRestrictionUserCommand.ExecuteReaderAsync())
-                    {
-                        if (await readerUpdateRestrictionUserCommand.ReadAsync())
-                        {
-                            var newUpdateRestrictionUser = MapReaderToBan(readerUpdateRestrictionUserCommand);
-
-                            _logger.LogInformation("Інформація користувача {Login} успішно оновлена!", entity.Login);
-
-                            return new RepositoryResponse<UserRestriction>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.Update.Ok,
-                                Data = newUpdateRestrictionUser,
-                                Message = $"Інформація користувача {entity.Login} успішно оновлена!"
-                            };
-                        }
-                    }
-                }
-
-                _logger.LogWarning("Виникла помилка при оновленні інформації користувача!");
-
-                return new RepositoryResponse<UserRestriction>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.NotFound,
-                    Message = "Користувача не знайдено, оновлення неможливе."
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<UserRestriction>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
-
-                return new RepositoryResponse<UserRestriction>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
-        }
-
-        public async Task<RepositoryResponse<UserRestriction>> DeleteAsync(Guid id)
-        {
-            try
-            {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
-
-                var sql = $@"
+                var sql = @"
                     DELETE FROM 
                         User_Restrictions
                     WHERE 
@@ -200,172 +82,205 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var deleteRestrictionUser = MapReaderToBan(readerDeleteRestrictionUserCommand);
 
-                            _logger.LogInformation("Запис про користувача {id} видалено!", deleteRestrictionUser.UserId);
+                            _logger.LogInformation("Запис про користувача {UserId} видалено!", deleteRestrictionUser.UserId);
 
-                            return new RepositoryResponse<UserRestriction>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.Delete.Ok,
-                                Message = $"Запис про користувача {deleteRestrictionUser.UserId} видалено!",
-                                Data = deleteRestrictionUser
-                            };
+                            return deleteRestrictionUser;
                         }
                     }
                 }
 
-                _logger.LogWarning("Запис не знайдено, видалення не можливе");
-
-                return new RepositoryResponse<UserRestriction>
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.NotFound,
-                    Message = "Запис не знайдено, видалення неможливе."
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<UserRestriction>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
-
-                return new RepositoryResponse<UserRestriction>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                throw new EntityNotFoundException("Запис не знайдено, видалення не можливе");
+            });
         }
 
-        public async Task<RepositoryResponse<UserRestriction>> GetActiveBanByUserIdAsync(Guid userId)
+        public async Task<UserRestriction> UpdateAsync(UserRestriction entity)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                var sql = $@"";
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
+                var sql = @"
+                    UPDATE 
+                        User_Restrictions 
+                    SET 
+                        user_id = @UserId,
+                        login = @Login,
+                        reason = @Reason,
+                        name_banned_by = @NameBannedBy,
+                        expires_at = @ExpiresAt,
+                        is_active = @IsActive
+                    WHERE 
+                        id = @Id
+                    RETURNING * ";
 
-                return new RepositoryResponse<UserRestriction>()
+                await using (var updateRestrictionUserCommand = new NpgsqlCommand(sql, conn))
                 {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
+                    updateRestrictionUserCommand.Parameters.AddWithValue("@Id", entity.Id);
+                    updateRestrictionUserCommand.Parameters.AddWithValue("@UserId", entity.UserId);
+                    updateRestrictionUserCommand.Parameters.AddWithValue("@Login", entity.Login);
+                    updateRestrictionUserCommand.Parameters.AddWithValue("@Reason", entity.Reason ?? (object)DBNull.Value);
+                    updateRestrictionUserCommand.Parameters.AddWithValue("@NameBannedBy", entity.NameBannedBy);
+                    updateRestrictionUserCommand.Parameters.AddWithValue("@ExpiresAt", entity.ExpiresAt ?? (object)DBNull.Value);
+                    updateRestrictionUserCommand.Parameters.AddWithValue("@IsActive", entity.IsActive);
 
-                return new RepositoryResponse<UserRestriction>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                    await using (var readerUpdateRestrictionUserCommand = await updateRestrictionUserCommand.ExecuteReaderAsync())
+                    {
+                        if (await readerUpdateRestrictionUserCommand.ReadAsync())
+                        {
+                            var newUpdateRestrictionUser = MapReaderToBan(readerUpdateRestrictionUserCommand);
+
+                            _logger.LogInformation("Інформація користувача {Login} успішно оновлена!", entity.Login);
+
+                            return newUpdateRestrictionUser;
+                        }
+                    }
+                }
+
+                throw new EntityNotFoundException("Виникла помилка при оновленні інформації користувача!");
+            });
         }
 
-        public async Task<RepositoryResponse<IEnumerable<UserRestriction>>> GetAllBansByUserIdAsync(Guid userId)
+        public async Task<UserRestriction> GetActiveBanByUserIdAsync(Guid userId)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                return new RepositoryResponse<IEnumerable<UserRestriction>>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
+                var sql = @"
+                    SELECT 
+                        id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
+                    FROM 
+                        User_Restrictions
+                    WHERE 
+                        user_id = @UserId
+                    AND 
+                        is_active = true";
 
-                return new RepositoryResponse<IEnumerable<UserRestriction>>()
+                await using (var getActiveUserRestrictionCommand = new NpgsqlCommand(sql, conn))
                 {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                    getActiveUserRestrictionCommand.Parameters.AddWithValue("@UserId", userId);
+
+                    await using (var readerActiveUserRestriction = await getActiveUserRestrictionCommand.ExecuteReaderAsync())
+                    {
+                        if (await readerActiveUserRestriction.ReadAsync())
+                        {
+                            var userRestriction = MapReaderToBan(readerActiveUserRestriction);
+
+                            _logger.LogInformation("Заблокований користувач {userId} знайдено!", userId);
+
+                            return userRestriction;
+                        }
+                    }
+                }
+
+                throw new EntityNotFoundException($"Активних блокувань для користувача не знайдено!");
+            });
         }
 
-        public async Task<RepositoryResponse<UserRestriction>> GetBanByIdAsync(Guid banId)
+        public async Task<IEnumerable<UserRestriction>> GetAllBansByUserIdAsync(Guid userId)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
+                var userRestrictionsList = new List<UserRestriction>();
 
-                return new RepositoryResponse<UserRestriction>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                return new RepositoryResponse<UserRestriction>()
+                var sql = @"
+                    SELECT 
+                        id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
+                    FROM 
+                        User_Restrictions
+                    WHERE 
+                        user_id = @UserId ";
+
+                await using (var getAllUserRestrictionCommand = new NpgsqlCommand(sql, conn))
                 {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                    getAllUserRestrictionCommand.Parameters.AddWithValue("@UserId", userId);
+
+                    await using (var readerAllUserRestriction = await getAllUserRestrictionCommand.ExecuteReaderAsync())
+                    {
+                        while (await readerAllUserRestriction.ReadAsync())
+                        {
+                            var userRestriction = MapReaderToBan(readerAllUserRestriction);
+
+                            userRestrictionsList.Add(userRestriction);
+                        }
+
+                        return userRestrictionsList;
+                    }
+                }
+            });
         }
 
-        public async Task<RepositoryResponse<IEnumerable<UserRestriction>>> GetBansByAdminNicknameAsync(string adminNickname)
+        public async Task<UserRestriction> GetBanByIdAsync(Guid banId)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                return new RepositoryResponse<IEnumerable<UserRestriction>>() 
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL",
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
+                var sql = @"
+                    SELECT 
+                        id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
+                    FROM 
+                        User_Restrictions
+                    WHERE 
+                        id = @Id ";
 
-                return new RepositoryResponse<IEnumerable<UserRestriction>>()
+                await using (var getRestrictionCommand = new NpgsqlCommand(sql, conn))
                 {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                    getRestrictionCommand.Parameters.AddWithValue("@Id", banId);
+
+                    await using (var readerGetRestrictionCommand = await getRestrictionCommand.ExecuteReaderAsync())
+                    {
+                        if (await readerGetRestrictionCommand.ReadAsync())
+                        {
+                            var restrictionEntity = MapReaderToBan(readerGetRestrictionCommand);
+
+                            _logger.LogInformation("Запис бану знайдено!");
+
+                            return restrictionEntity;
+                        }
+                    }
+                }
+
+                throw new EntityNotFoundException($"Запис бану з ID {banId} не знайдено");
+            });
+        }
+
+        public async Task<IEnumerable<UserRestriction>> GetBansByAdminNicknameAsync(string adminNickname)
+        {
+            return await ExecuteAsync(async () =>
+            {
+                var bannedByAdminList = new List<UserRestriction>();
+
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+
+                var sql = @"
+                    SELECT 
+                        id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
+                    FROM 
+                        User_Restrictions
+                    WHERE 
+                        name_banned_by = @NameBannedBy";
+
+                await using (var bannedByAdminCommand = new NpgsqlCommand(sql, conn))
+                {
+                    bannedByAdminCommand.Parameters.AddWithValue("@NameBannedBy", adminNickname);
+
+                    await using (var readerBannedByAdminCommand = await bannedByAdminCommand.ExecuteReaderAsync())
+                    {
+
+                        while (await readerBannedByAdminCommand.ReadAsync())
+                        {
+                            var banRecord = MapReaderToBan(readerBannedByAdminCommand);
+
+                            bannedByAdminList.Add(banRecord);
+                        }
+
+                        return bannedByAdminList;
+                    }
+                }
+            });
         }
 
         private UserRestriction MapReaderToBan(NpgsqlDataReader reader)
@@ -374,12 +289,12 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
             {
                 Id = reader.GetGuid(reader.GetOrdinal("id")),
                 UserId = reader.GetGuid(reader.GetOrdinal("user_id")),
-                Login = reader["login"] as string ?? string.Empty,
-                Reason = reader["reason"] as string ?? string.Empty,
-                NameBannedBy = reader["name_banned_by"] as string ?? string.Empty,
+                Login = reader.GetFieldValue<string>(reader.GetOrdinal("login")),
+                Reason = reader.IsDBNull(reader.GetOrdinal("reason")) ? null : reader.GetString(reader.GetOrdinal("reason")),
+                NameBannedBy = reader.GetString(reader.GetOrdinal("name_banned_by")),
                 CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
-                ExpiresAt = reader.GetDateTime(reader.GetOrdinal("expires_at")),
-                IsActive = Convert.ToBoolean(reader["is_active"])
+                ExpiresAt = reader.IsDBNull(reader.GetOrdinal("expires_at")) ? null : reader.GetDateTime(reader.GetOrdinal("expires_at")),
+                IsActive = reader.GetBoolean(reader.GetOrdinal("is_active"))
             };
         }
     }

@@ -1,13 +1,14 @@
 ﻿using Authorization.Domain.Entities;
-using Contracts.Interface;
-using Contracts.Models.RepositoryResponse;
+using Contracts.Interfaces;
 
 namespace Authorization.Application.Interfaces.Repositories
 {
-    public interface IUserRepository : IBaseRepository<User, RepositoryResponse<User>>
+    public interface IUserRepository : IBaseRepository<User>
     {
-        Task<RepositoryResponse<User>> GetUserByIdAsync(Guid userId);
+        Task<User> GetUserByIdAsync(Guid userId);
 
-        Task<RepositoryResponse<User>> GetUserByLoginAsync(string userLogin);
+        Task<User> GetUserByLoginAsync(string userLogin);
+
+        Task<User?> FindUserByLoginAsync(string userLogin);
     }
 }

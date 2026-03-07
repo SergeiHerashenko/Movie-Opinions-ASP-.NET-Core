@@ -1,17 +1,16 @@
 ﻿using Authorization.Domain.Entities;
-using Contracts.Interface;
-using Contracts.Models.RepositoryResponse;
+using Contracts.Interfaces;
 
 namespace Authorization.Application.Interfaces.Repositories
 {
-    public interface IUserRestrictionRepository : IBaseRepository<UserRestriction, RepositoryResponse<UserRestriction>>
+    public interface IUserRestrictionRepository : IBaseRepository<UserRestriction>
     {
-        Task<RepositoryResponse<UserRestriction>> GetBanByIdAsync(Guid banId);
+        Task<UserRestriction> GetBanByIdAsync(Guid banId);
 
-        Task<RepositoryResponse<IEnumerable<UserRestriction>>> GetAllBansByUserIdAsync(Guid userId);
+        Task<IEnumerable<UserRestriction>> GetAllBansByUserIdAsync(Guid userId);
 
-        Task<RepositoryResponse<UserRestriction>> GetActiveBanByUserIdAsync(Guid userId);
+        Task<UserRestriction> GetActiveBanByUserIdAsync(Guid userId);
 
-        Task<RepositoryResponse<IEnumerable<UserRestriction>>> GetBansByAdminNicknameAsync(string adminNickname);
+        Task<IEnumerable<UserRestriction>> GetBansByAdminNicknameAsync(string adminNickname);
     }
 }

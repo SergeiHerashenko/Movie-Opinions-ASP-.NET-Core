@@ -1,32 +1,30 @@
 ﻿using Authorization.Application.Interfaces.Repositories;
 using Authorization.Domain.Entities;
 using Authorization.Infrastructure.Persistence.Context.AdoNet;
-using Contracts.Models.RepositoryResponse;
-using Contracts.Models.Status;
+using Authorization.Infrastructure.Persistence.Repositories.Base;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 {
-    public class AdoUserDeletionRepository : IUserDeletionRepository
+    public class AdoUserDeletionRepository : RepositoryBase, IUserDeletionRepository
     {
-        private readonly IDbConnectionProvider _connectionProvider;
-        private readonly ILogger<AdoUserDeletionRepository> _logger;
+        private readonly IDbConnectionProvider _dbonnectionProvider;
 
         public AdoUserDeletionRepository(IDbConnectionProvider dbConnectionProvider,
             ILogger<AdoUserDeletionRepository> logger)
+                : base(logger)
         {
-            _connectionProvider = dbConnectionProvider;
-            _logger = logger;
+            _dbonnectionProvider = dbConnectionProvider;
         }
 
-        public async Task<RepositoryResponse<UserDeletion>> CreateAsync(UserDeletion entity)
+        public async Task<UserDeletion> CreateAsync(UserDeletion entity)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbonnectionProvider.GetOpenConnectionAsync();
 
-                var sql = $@"
+                var sql = @"
                     INSERT INTO 
                         Users_Deleted (id, user_id, login, reason, deleted_at) 
                     VALUES 
@@ -42,63 +40,62 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                     await using (var readerDeletedUserCommand = await deletedUserCommand.ExecuteReaderAsync())
                     {
-                        if (await  readerDeletedUserCommand.ReadAsync())
+                        if (await readerDeletedUserCommand.ReadAsync())
                         {
                             var newDeletedUser = MapReaderToDeleteUser(readerDeletedUserCommand);
 
                             _logger.LogInformation("Користувач {Login}, був успішно збережений!", entity.Login);
 
-                            return new RepositoryResponse<UserDeletion>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.Create.Created,
-                                Data = newDeletedUser,
-                                Message = $"Користувач {entity.Login}, був успішно збережений!"
-                            };
+                            return newDeletedUser;
                         }
                     }
                 }
 
-                _logger.LogWarning("Сталась помилка запису в таблицю!");
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Сталась помилка запису в таблицю!"
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                throw new Exception("Не вдалося отримати дані після вставки");
+            });
         }
 
-        public async Task<RepositoryResponse<UserDeletion>> UpdateAsync(UserDeletion entity)
+        public async Task<UserDeletion> DeleteAsync(Guid id)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbonnectionProvider.GetOpenConnectionAsync();
 
-                var sql = $@"
+                var sql = @"
+                    DELETE FROM 
+                        Users_Deleted
+                    WHERE 
+                        user_id = @UserId
+                    RETURNING * ";
+
+                await using (var deletedUserRecordCommand = new NpgsqlCommand(sql, conn))
+                {
+                    deletedUserRecordCommand.Parameters.AddWithValue("@UserId", id);
+
+                    await using (var readerDeletedUserRecordCommand = await deletedUserRecordCommand.ExecuteReaderAsync())
+                    {
+                        if (await readerDeletedUserRecordCommand.ReadAsync())
+                        {
+                            var deletedRecordUser = MapReaderToDeleteUser(readerDeletedUserRecordCommand);
+
+                            _logger.LogInformation("Інформація користувач {id}, була успішно видалена!", id);
+
+                            return deletedRecordUser;
+                        }
+                    }
+                }
+
+                throw new Exception("Сталась помилка видалення інформації з таблиці!");
+            });
+        }
+
+        public async Task<UserDeletion> UpdateAsync(UserDeletion entity)
+        {
+            return await ExecuteAsync(async () =>
+            {
+                await using var conn = await _dbonnectionProvider.GetOpenConnectionAsync();
+
+                var sql = @"
                     UPDATE 
                         Users_Deleted
                     SET 
@@ -124,126 +121,22 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                             _logger.LogInformation("Інформація користувач {Login}, була успішно оновлена!", entity.Login);
 
-                            return new RepositoryResponse<UserDeletion>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.Update.Ok,
-                                Data = newUpdateDeletedUser,
-                                Message = $"Інформація користувача {entity.Login}, була успішно оновлена!"
-                            };
+                            return newUpdateDeletedUser;
                         }
                     }
                 }
 
-                _logger.LogWarning("Сталась помилка оновлення інформації в таблицю!");
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Сталась помилка оновлення інформації в таблицю!"
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                throw new Exception("Сталась помилка оновлення інформації в таблиці!");
+            });
         }
 
-        public async Task<RepositoryResponse<UserDeletion>> DeleteAsync(Guid id)
+        public async Task<UserDeletion> GetUserDeletionsByIdAsync(Guid userId)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbonnectionProvider.GetOpenConnectionAsync();
 
-                var sql = $@"
-                    DELETE FROM 
-                        Users_Deleted
-                    WHERE 
-                        user_id = @UserId
-                    RETURNING * ";
-
-                await using (var deletedUserRecordCommand = new NpgsqlCommand(sql, conn))
-                {
-                    deletedUserRecordCommand.Parameters.AddWithValue("@UserId", id);
-
-                    await using (var readerDeletedUserRecordCommand = await deletedUserRecordCommand.ExecuteReaderAsync())
-                    {
-                        if (await readerDeletedUserRecordCommand.ReadAsync())
-                        {
-                            var deletedRecordUser = MapReaderToDeleteUser(readerDeletedUserRecordCommand);
-
-                            _logger.LogInformation("Інформація користувач {id}, була успішно видалена!", id);
-
-                            return new RepositoryResponse<UserDeletion>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.Delete.Ok,
-                                Data = deletedRecordUser,
-                                Message = $"Інформація користувач {id}, була успішно видалена"
-                            };
-                        }
-                    }
-                }
-
-                _logger.LogWarning("Сталась помилка видалення інформації в таблицю!");
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Сталась помилка видалення інформації в таблицю!"
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
-        }
-
-        public async Task<RepositoryResponse<UserDeletion>> GetUserDeletionsByIdAsync(Guid userId)
-        {
-            try
-            {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
-
-                var sql = $@"
+                var sql = @"
                     SELECT 
                         id, user_id, login, reason, deleted_at
                     FROM 
@@ -263,57 +156,22 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                             _logger.LogInformation("Інформація про користувача {userId}, знайдена!", userId);
 
-                            return new RepositoryResponse<UserDeletion>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.General.Ok,
-                                Data = deletedRecordUser,
-                                Message = $"Інформація про користувача {userId}, знайдена!"
-                            };
+                            return deletedRecordUser;
                         }
                     }
                 }
 
-                _logger.LogWarning("Користувача {userId} не знайдено!", userId);
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.NotFound,
-                    Message = $"Користувача {userId} не знайдено!"
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                throw new Exception("Сталась помилка при видаленні інформації в таблиці!");
+            });
         }
 
-        public async Task<RepositoryResponse<UserDeletion>> GetUserDeletionsByLoginAsync(string userLogin)
+        public async Task<UserDeletion> GetUserDeletionsByLoginAsync(string userLogin)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbonnectionProvider.GetOpenConnectionAsync();
 
-                var sql = $@"
+                var sql = @"
                     SELECT 
                         id, user_id, login, reason, deleted_at
                     FROM 
@@ -333,48 +191,13 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                             _logger.LogInformation("Інформація про користувача {userLogin}, знайдена!", userLogin);
 
-                            return new RepositoryResponse<UserDeletion>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.General.Ok,
-                                Data = deletedRecordUser,
-                                Message = $"Інформація про користувача {userLogin}, знайдена!"
-                            };
+                            return deletedRecordUser;
                         }
                     }
                 }
 
-                _logger.LogWarning("Користувача {userLogin} не знайдено!", userLogin);
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.NotFound,
-                    Message = $"Користувача {userLogin} не знайдено!"
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
-
-                return new RepositoryResponse<UserDeletion>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                throw new Exception("Сталась помилка при видаленні інформації в таблиці!");
+            });
         }
 
         private UserDeletion MapReaderToDeleteUser(NpgsqlDataReader reader)

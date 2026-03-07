@@ -1,4 +1,6 @@
 ﻿using Authorization.Application.DTO.Authentication.Request;
+using Authorization.Application.DTO.Users;
+using Authorization.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Authorization.Controllers
@@ -7,10 +9,20 @@ namespace Authorization.Controllers
     [Route("api/auth")]
     public class AuthorizationController : ControllerBase
     {
-        [HttpPost("registration")]
-        public async Task<IActionResult> Register([FromBody] UserRegistrationDTO userRegistrationDTO)
+        private readonly IAuthorizationService _authorizationService;
+        private readonly ILogger<AuthorizationController> _logger;
+
+        public AuthorizationController(IAuthorizationService authorizationService,
+            ILogger<AuthorizationController> logger)
         {
-            return Ok();
+            _authorizationService = authorizationService;
+            _logger = logger;
+        }
+
+        [HttpPost("registration")]
+        public async Task<UserResponseDTO> Register([FromBody] UserRegistrationDTO userRegistrationDTO)
+        {
+            return await _authorizationService.RegistrationAsync(userRegistrationDTO);
         }
     }
 }

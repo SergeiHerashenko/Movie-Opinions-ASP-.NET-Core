@@ -1,4 +1,5 @@
 ﻿using Authorization.Domain.Common;
+using Authorization.Domain.Enums;
 using Contracts.Enum;
 
 namespace Authorization.Domain.Entities
@@ -8,6 +9,8 @@ namespace Authorization.Domain.Entities
         public Guid Id { get; set; }
 
         public required string Login { get; set; }
+
+        public LoginType LoginType { get; set; }
 
         public required string PasswordHash { get; set; }
 

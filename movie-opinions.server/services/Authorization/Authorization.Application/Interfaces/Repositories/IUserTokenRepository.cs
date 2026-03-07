@@ -1,11 +1,10 @@
 ﻿using Authorization.Domain.Entities;
-using Contracts.Interface;
-using Contracts.Models.RepositoryResponse;
+using Contracts.Interfaces;
 
 namespace Authorization.Application.Interfaces.Repositories
 {
-    public interface IUserTokenRepository : IBaseRepository<UserToken, RepositoryResponse<UserToken>>
+    public interface IUserTokenRepository : IBaseRepository<UserToken>
     {
-        Task<RepositoryResponse<UserToken>> GetUserTokenAsync(string refreshToken);
+        Task<UserToken> GetUserTokenAsync(string refreshToken);
     }
 }

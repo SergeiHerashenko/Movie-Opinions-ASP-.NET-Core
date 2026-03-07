@@ -1,33 +1,32 @@
 ﻿using Authorization.Application.Interfaces.Repositories;
 using Authorization.Domain.Entities;
+using Authorization.Domain.Exceptions;
 using Authorization.Infrastructure.Persistence.Context.AdoNet;
+using Authorization.Infrastructure.Persistence.Repositories.Base;
 using Contracts.Enum;
-using Contracts.Models.RepositoryResponse;
-using Contracts.Models.Status;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 {
-    public class AdoUserRepository : IUserRepository
+    public class AdoUserRepository : RepositoryBase, IUserRepository
     {
-        private readonly IDbConnectionProvider _connectionProvider;
-        private readonly ILogger<AdoUserRepository> _logger;
+        private readonly IDbConnectionProvider _dbconnectionProvider;
 
         public AdoUserRepository(IDbConnectionProvider connectionProvider,
             ILogger<AdoUserRepository> logger)
+                : base(logger)
         {
-            _connectionProvider = connectionProvider;
-            _logger = logger;
+            _dbconnectionProvider = connectionProvider;
         }
 
-        public async Task<RepositoryResponse<User>> CreateAsync(User entity)
+        public async Task<User> CreateAsync(User entity)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                var sql = $@"
+                var sql = @"
                         INSERT INTO 
                             Users (id, login, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted) 
                         VALUES 
@@ -54,57 +53,56 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                             _logger.LogInformation("Користувач {Id} збережений в базу", newUser.Id);
 
-                            return new RepositoryResponse<User>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.Create.Created,
-                                Data = newUser,
-                                Message = "Користувач створений!"
-                            };
+                            return newUser;
                         }
                     }
                 }
 
-                _logger.LogCritical("Сталась помилка запису користувача {Id}!", entity.Id);
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Сталась помилка запису!"
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                throw new Exception("Не вдалося отримати дані після вставки");
+            });
         }
 
-        public async Task<RepositoryResponse<User>> UpdateAsync(User entity)
+        public async Task<User> DeleteAsync(Guid id)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                var sql = $@"
+                var sql = @"
+                        DELETE FROM 
+                            Users 
+                        WHERE
+                            id = @Id 
+                        RETURNING * ";
+
+                await using (var deletedUserCommand = new NpgsqlCommand(sql, conn))
+                {
+                    deletedUserCommand.Parameters.AddWithValue("@Id", id);
+
+                    await using (var readerDeletedUserCommand = await deletedUserCommand.ExecuteReaderAsync())
+                    {
+                        if (await readerDeletedUserCommand.ReadAsync())
+                        {
+                            var userEntity = MapReaderToUser(readerDeletedUserCommand);
+
+                            _logger.LogInformation("Користувача {id} успішно видалено!", id);
+
+                            return userEntity;
+                        }
+                    }
+                }
+
+                throw new UserNotFoundException("Користувача не знайдено, видалення не можливе");
+            });
+        }
+
+        public async Task<User> UpdateAsync(User entity)
+        {
+            return await ExecuteAsync(async () =>
+            {
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+
+                var sql = @"
                         UPDATE 
                             Users 
                         SET 
@@ -140,194 +138,22 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                             _logger.LogInformation("Дані користувача {Login} успішно оновлені!", updateUser.Login);
 
-                            return new RepositoryResponse<User>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.Update.Ok,
-                                Data = updateUser,
-                                Message = $"Інформація користувача {updateUser.Login} успішно оновлена!"
-                            };
+                            return updateUser;
                         }
                     }
                 }
 
-                _logger.LogWarning("Виникла помилка при оновленні інформації користувача {Login}!", entity.Login);
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.NotFound,
-                    Message = $"Користувача {entity.Login} не знайдено, оновлення неможливе."
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка бази даних!");
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка!"
-                };
-            }
+                throw new Exception("Виникла помилка при оновленні інформації користувача!");
+            });
         }
 
-        public async Task<RepositoryResponse<User>> DeleteAsync(Guid id)
+        public async Task<User?> FindUserByLoginAsync(string userLogin)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                var sql = $@"
-                        DELETE FROM 
-                            Users 
-                        WHERE
-                            id = @Id 
-                        RETURNING * ";
-
-                await using (var deletedUserCommand = new NpgsqlCommand(sql, conn))
-                {
-                    deletedUserCommand.Parameters.AddWithValue("@Id", id);
-
-                    await using (var readerDeletedUserCommand = await deletedUserCommand.ExecuteReaderAsync())
-                    {
-                        if (await readerDeletedUserCommand.ReadAsync())
-                        {
-                            var userEntity = MapReaderToUser(readerDeletedUserCommand);
-
-                            _logger.LogInformation("Користувача {id} успішно видалено!", id);
-
-                            return new RepositoryResponse<User>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.Delete.Ok,
-                                Message = $"Користувача {id} успішно видалено!",
-                                Data = userEntity
-                            };
-                        }
-                    }
-                }
-
-                _logger.LogWarning("Користувача {id} не знайдено, видалення не можливе", id);
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.NotFound,
-                    Message = $"Користувача {id} не знайдено, видалення неможливе."
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка бази даних!");
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка!"
-                };
-            }
-        }
-
-        public async Task<RepositoryResponse<User>> GetUserByIdAsync(Guid userId)
-        {
-            try
-            {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
-
-                var sql = $@"
-                        SELECT 
-                            id, login, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
-                        FROM 
-                            Users 
-                        WHERE 
-                            id = @Id";
-
-                await using (var getUserByIdCommand = new NpgsqlCommand(sql, conn))
-                {
-                    getUserByIdCommand.Parameters.AddWithValue("@Id", userId);
-
-                    await using (var readerGetUserByIdCommand = await getUserByIdCommand.ExecuteReaderAsync())
-                    {
-                        if (await readerGetUserByIdCommand.ReadAsync())
-                        {
-                            var userEntity = MapReaderToUser(readerGetUserByIdCommand);
-
-                            return new RepositoryResponse<User>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.General.Ok,
-                                Message = $"Користувача {userId} знайдено!",
-                                Data = userEntity
-                            };
-                        }
-                    }
-                }
-
-                _logger.LogWarning("Користувача {userId} не знайдено", userId);
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.NotFound,
-                    Message = $"Користувача {userId} не знайдено!"
-                };
-            }
-            catch (NpgsqlException ex)
-            {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
-
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
-        }
-
-        public async Task<RepositoryResponse<User>> GetUserByLoginAsync(string userLogin)
-        {
-            try
-            {
-                await using var conn = await _connectionProvider.GetOpenConnectionAsync();
-
-                var sql = $@"
+                var sql = @"
                         SELECT 
                             id, login, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
                         FROM 
@@ -345,48 +171,79 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var userEntity = MapReaderToUser(readergetUserByLoginCommand);
 
-                            return new RepositoryResponse<User>()
-                            {
-                                IsSuccess = true,
-                                StatusCode = StatusCode.General.Ok,
-                                Message = $"Користувача {userLogin} знайдено!",
-                                Data = userEntity
-                            };
+                            return userEntity;
                         }
                     }
                 }
 
-                _logger.LogWarning("Користувача {userLogin} не знайдено", userLogin);
+                return null;
+            });
+        }
 
-                return new RepositoryResponse<User>()
-                {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.NotFound,
-                    Message = $"Користувача {userLogin} не знайдено!"
-                };
-            }
-            catch (NpgsqlException ex)
+        public async Task<User> GetUserByIdAsync(Guid userId)
+        {
+            return await ExecuteAsync(async () =>
             {
-                _logger.LogCritical(ex, "Помилка PostgreSQL: {Code}", ex.SqlState);
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                return new RepositoryResponse<User>()
+                var sql = @"
+                        SELECT 
+                            id, login, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
+                        FROM 
+                            Users 
+                        WHERE 
+                            id = @Id";
+
+                await using (var getUserByIdCommand = new NpgsqlCommand(sql, conn))
                 {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Помилка PostgreSQL"
-                };
-            }
-            catch (Exception ex)
+                    getUserByIdCommand.Parameters.AddWithValue("@Id", userId);
+
+                    await using (var readerGetUserByIdCommand = await getUserByIdCommand.ExecuteReaderAsync())
+                    {
+                        if (await readerGetUserByIdCommand.ReadAsync())
+                        {
+                            var userEntity = MapReaderToUser(readerGetUserByIdCommand);
+
+                            return userEntity;
+                        }
+                    }
+                }
+
+                throw new UserNotFoundException("Користувача за id не знайдено");
+            });
+        }
+
+        public async Task<User> GetUserByLoginAsync(string userLogin)
+        {
+            return await ExecuteAsync(async () =>
             {
-                _logger.LogCritical(ex, "Критична помилка баз даних!");
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
 
-                return new RepositoryResponse<User>()
+                var sql = @"
+                        SELECT 
+                            id, login, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
+                        FROM 
+                            Users 
+                        WHERE 
+                            login = @Login";
+
+                await using (var getUserByLoginCommand = new NpgsqlCommand(sql, conn))
                 {
-                    IsSuccess = false,
-                    StatusCode = StatusCode.General.InternalError,
-                    Message = "Критична помилка баз даних!"
-                };
-            }
+                    getUserByLoginCommand.Parameters.AddWithValue("@Login", userLogin);
+
+                    await using (var readergetUserByLoginCommand = await getUserByLoginCommand.ExecuteReaderAsync())
+                    {
+                        if (await readergetUserByLoginCommand.ReadAsync())
+                        {
+                            var userEntity = MapReaderToUser(readergetUserByLoginCommand);
+
+                            return userEntity;
+                        }
+                    }
+                }
+
+                throw new UserNotFoundException("Користувача за логіном не знайдено");
+            });
         }
 
         private User MapReaderToUser(NpgsqlDataReader reader)

@@ -1,11 +1,10 @@
 ﻿using Authorization.Domain.Entities;
-using Contracts.Interface;
-using Contracts.Models.RepositoryResponse;
+using Contracts.Interfaces;
 
 namespace Authorization.Application.Interfaces.Repositories
 {
-    public interface IUserPendingAccountChangesRepository : IBaseRepository<UserPendingChange, RepositoryResponse<UserPendingChange>>
+    public interface IUserPendingAccountChangesRepository : IBaseRepository<UserPendingChange>
     {
-        Task<RepositoryResponse<UserPendingChange>> GetPendingChangesAsync(string token);
+        Task<UserPendingChange> GetPendingChangesAsync(string token);
     }
 }

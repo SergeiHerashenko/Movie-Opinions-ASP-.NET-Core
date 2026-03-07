@@ -1,0 +1,53 @@
+﻿using Authorization.Domain.Exceptions;
+using Contracts.Model.Response;
+using Microsoft.AspNetCore.Diagnostics;
+using static Contracts.Models.Status.StatusCode;
+
+namespace Authorization.Middleware
+{
+    public class AuthExceptionHandler : IExceptionHandler
+    {
+        private readonly ILogger<AuthExceptionHandler> _logger;
+
+        public AuthExceptionHandler(ILogger<AuthExceptionHandler> logger)
+        {
+            _logger = logger;
+        }
+
+        public async ValueTask<bool> TryHandleAsync(
+            HttpContext httpContext,
+            Exception exception,
+            CancellationToken cancellationToken)
+        {
+            var (statusCode, message) = exception switch
+            {
+                BaseApplicationException appEx => (appEx.StatusCode, appEx.Message),
+
+                _ => (General.InternalError, "Сталася внутрішня помилка сервера")
+            };
+
+            if (statusCode >= 500)
+            {
+                _logger.LogError(exception, "Критична помилка: {Message}", exception.Message);
+            }
+            else
+            {
+                _logger.LogWarning("Попередження бізнес-логіки: {Message}", exception.Message);
+            }
+
+            httpContext.Response.StatusCode = statusCode;
+            httpContext.Response.ContentType = "application/json";
+
+            var errorResponse = new ServiceResponse()
+            {
+                IsSuccess = false,
+                Message = message,
+                StatusCode = statusCode,
+            };
+
+            await httpContext.Response.WriteAsJsonAsync(errorResponse, cancellationToken);
+
+            return true;
+        }
+    }
+}

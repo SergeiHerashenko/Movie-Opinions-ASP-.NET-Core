@@ -5,7 +5,7 @@ namespace Authorization.Application.DTO.Authentication.Request
     public class UserLoginDTO
     {
         [Required(ErrorMessage = "Логін є обов'язковим")]
-        public required string Login {  get; set; }
+        public required string Login { get; set; }
 
         [Required]
         [DataType(DataType.Password)]
