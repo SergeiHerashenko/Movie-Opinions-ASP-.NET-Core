@@ -2,7 +2,6 @@
 using Authorization.Domain.Entities;
 using Authorization.Infrastructure.Persistence.Context.AdoNet;
 using Authorization.Infrastructure.Persistence.Repositories.Base;
-using Contracts.Models.Status;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -159,6 +158,43 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                             return tokenEntity;
                         }
+                    }
+                }
+
+                throw new Exception("Сталась помилка при пошуку токену!");
+            });
+        }
+
+        public async Task<IEnumerable<UserToken>> GetAllTokensUserAsync(Guid userId)
+        {
+            var userTokensList = new List<UserToken>();
+
+            return await ExecuteAsync(async () =>
+            {
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
+
+                var sql = @"
+                    SELECT 
+                        id, user_id, refresh_token, expiration_token, created_at 
+                    FROM
+                        User_Tokens
+                    WHERE
+                        id = @Id ";
+
+                await using (var getTokenCommand = new NpgsqlCommand(sql, conn))
+                {
+                    getTokenCommand.Parameters.AddWithValue("@Id", userId);
+
+                    await using (var readerGetTokenCommand = await getTokenCommand.ExecuteReaderAsync())
+                    {
+                        while (await readerGetTokenCommand.ReadAsync())
+                        {
+                            var tokenEntity = MapReaderToToken(readerGetTokenCommand);
+
+                            userTokensList.Add(tokenEntity);
+                        }
+
+                        return userTokensList;
                     }
                 }
 

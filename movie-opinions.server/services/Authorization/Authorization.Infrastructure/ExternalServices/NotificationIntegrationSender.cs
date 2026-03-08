@@ -1,7 +1,6 @@
 ﻿using Authorization.Application.DTO.Integration;
 using Authorization.Application.Interfaces.ExternalServices;
 using Authorization.Application.Interfaces.Http;
-using Authorization.Domain.Entities;
 using Contracts.Model.Response;
 using Contracts.Models;
 using Microsoft.Extensions.Logging;

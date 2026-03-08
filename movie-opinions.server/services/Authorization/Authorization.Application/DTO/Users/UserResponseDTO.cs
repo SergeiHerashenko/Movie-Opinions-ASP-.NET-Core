@@ -11,6 +11,7 @@ namespace Authorization.Application.DTO.Users
 
         public Role Role { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public RegistrationStep? NextStep { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -14,25 +14,27 @@ namespace Authorization.Infrastructure.Integration
         {
             var history = new Stack<IPostRegistrationStep>();
 
+            var finalResult = new ServiceResponse()
+            {
+                IsSuccess = true,
+                Message = "Кроки відсутні",
+                StatusCode = StatusCode.General.NotFound
+            };
+
             foreach (var step in steps.OrderBy(s => s.Order))
             {
-                var result = await step.ExecuteAsync(context);
+                finalResult = await step.ExecuteAsync(context);
 
-                if (!result.IsSuccess)
+                if (!finalResult.IsSuccess)
                 {
                     await RollbackHistory(context.UserId, history);
-                    return result;
+                    return finalResult;
                 }
 
                 history.Push(step);
             }
 
-            return new ServiceResponse
-            {
-                IsSuccess = true,
-                StatusCode = StatusCode.General.Ok,
-                Message = "Успіх!"
-            }; 
+            return finalResult;
         }
 
         private async Task RollbackHistory(Guid userId, Stack<IPostRegistrationStep> history)

@@ -37,5 +37,10 @@ namespace Authorization.Infrastructure.Persistence.Repositories.Dapper
         {
             throw new NotImplementedException();
         }
+
+        public Task<IEnumerable<UserToken>> GetAllTokensUserAsync(Guid userId)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

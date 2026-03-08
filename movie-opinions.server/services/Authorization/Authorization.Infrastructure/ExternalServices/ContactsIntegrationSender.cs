@@ -3,7 +3,6 @@ using Authorization.Application.Interfaces.ExternalServices;
 using Authorization.Application.Interfaces.Http;
 using Contracts.Model.Response;
 using Contracts.Models;
-using Contracts.Models.Status;
 using Microsoft.Extensions.Logging;
 
 namespace Authorization.Infrastructure.ExternalServices

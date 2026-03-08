@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Text;
+using System.Text.Json.Serialization;
 
 internal class Program
 {
@@ -52,6 +53,10 @@ internal class Program
             builder.Services.AddControllers(options =>
             {
                 options.Filters.Add<ApiResponseFilter>();
+            })
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
             });
 
             // 6. Swagger з підтримкою JWT

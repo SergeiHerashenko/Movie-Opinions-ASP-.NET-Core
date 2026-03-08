@@ -9,6 +9,7 @@ namespace Authorization.Application
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
             services.AddScoped<IAuthorizationService, AuthorizationService>();
+            services.AddScoped<ITokenService, TokenService>();
 
             return services;
         }

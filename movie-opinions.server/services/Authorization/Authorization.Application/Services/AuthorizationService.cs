@@ -1,6 +1,7 @@
 ﻿using Authorization.Application.DTO.Authentication.Request;
 using Authorization.Application.DTO.Context;
 using Authorization.Application.DTO.Users;
+using Authorization.Application.Enum;
 using Authorization.Application.Interfaces.ExternalServices;
 using Authorization.Application.Interfaces.Infrastructure;
 using Authorization.Application.Interfaces.Integration;
@@ -26,19 +27,22 @@ namespace Authorization.Application.Services
         private readonly IPasswordHasher _passwordHasher;
         private readonly IRegistrationOrchestrator _orchestrator;
         private readonly IContactTypeDetector _contactTypeDetector;
+        private readonly ITokenService _tokenService;
 
         public AuthorizationService(
             IUserRepository userRepository,
             ILogger<AuthorizationService> logger,
             IPasswordHasher passwordHasher,
             IRegistrationOrchestrator orchestrator,
-            IContactTypeDetector contactTypeDetector)
+            IContactTypeDetector contactTypeDetector,
+            ITokenService tokenService)
         {
             _userRepository = userRepository;
             _logger = logger;
             _passwordHasher = passwordHasher;
             _orchestrator = orchestrator;
             _contactTypeDetector = contactTypeDetector;
+            _tokenService = tokenService;
         }
 
         public Task<UserResponseDTO> LoginAsync(UserLoginDTO userLoginDTO)
@@ -64,7 +68,29 @@ namespace Authorization.Application.Services
             // 3. Збереження в базу
             var creationResult = await _userRepository.CreateAsync(newUser);
 
-            // 4. HTTP виклики до сервісів
+            // 4. Створення токену
+            var userSession = new UserSessionDTO()
+            {
+                UserId = newUser.Id,
+                Login = newUser.Login,
+                IsEmailConfirmed = false,
+                Role = newUser.Role 
+            };
+
+            if(!await _tokenService.CreateUserSessionAsync(userSession))
+            {
+                await _userRepository.DeleteAsync(newUser.Id);
+
+                return new UserResponseDTO()
+                {
+                    Login = null,
+                    Message = "Помилка при генерації токену. Спробуйте пізніше!",
+                    NextStep = null,
+                    Role = Role.Guest
+                };
+            }
+
+            // 5. HTTP виклики до сервісів
             var context = new RegistrationContext()
             {
                 UserId = newUser.Id,
@@ -77,19 +103,36 @@ namespace Authorization.Application.Services
                 },
                 Action = MessageActions.Registration
             };
-
+            
             var result = await _orchestrator.RunIntegrationsAsync(context);
-
+            
             if (!result.IsSuccess)
             {
+                await _tokenService.ClearAllUserSessionsAsync(newUser.Id);
+            
                 await _userRepository.DeleteAsync(newUser.Id);
-
-                // Додати правильну перевірку , і правильно повертати тип
+            
                 return new UserResponseDTO()
                 {
-                    Login = null
+                    Login = null,
+                    Message = result.Message,
+                    NextStep = null,
+                    Role = Role.Guest
                 };
             }
+
+            return new UserResponseDTO()
+            {
+                Login = newUser.Login,
+                Message = "result.Message",
+                NextStep = newUser.LoginType switch
+                {
+                    LoginType.Phone => RegistrationStep.SmsCodeRequired,
+                    LoginType.Email => RegistrationStep.EmailConfirmationSent,
+                    _ => throw new ArgumentOutOfRangeException(nameof(newUser.LoginType), "Unknown login type")
+                },
+                Role = newUser.Role
+            };
         }
 
         public Task<bool> LogoutAsync()

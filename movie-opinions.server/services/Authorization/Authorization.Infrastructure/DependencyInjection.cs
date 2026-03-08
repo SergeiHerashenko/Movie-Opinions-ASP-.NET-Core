@@ -46,6 +46,9 @@ namespace Authorization.Infrastructure
 
             services.AddScoped<IRegistrationOrchestrator, RegistrationOrchestrator>();
 
+            services.AddScoped<IJwtProvider, JwtProvider>();
+            services.AddScoped<ICookieProvider, CookieProvider>();
+
             services.AddProjectHttpClients(configuration);
 
             return services;
