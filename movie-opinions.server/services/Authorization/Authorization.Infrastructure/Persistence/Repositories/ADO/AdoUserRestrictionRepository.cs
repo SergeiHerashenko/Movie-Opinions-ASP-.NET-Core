@@ -27,7 +27,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     INSERT INTO 
-                        User_Restrictions (id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active) 
+                        User_Restrictions (restrictions_id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active) 
                     VALUES
                         (@Id, @UserId, @Login, @Reason, @NameBannedBy, NOW(), @ExpiresAt, @IsActive) 
                     RETURNING * ";
@@ -110,7 +110,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         expires_at = @ExpiresAt,
                         is_active = @IsActive
                     WHERE 
-                        id = @Id
+                        restrictions_id = @Id
                     RETURNING * ";
 
                 await using (var updateRestrictionUserCommand = new NpgsqlCommand(sql, conn))
@@ -148,7 +148,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     SELECT 
-                        id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
+                        restrictions_id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
                     FROM 
                         User_Restrictions
                     WHERE 
@@ -187,7 +187,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     SELECT 
-                        id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
+                        restrictions_id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
                     FROM 
                         User_Restrictions
                     WHERE 
@@ -220,7 +220,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     SELECT 
-                        id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
+                        restrictions_id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
                     FROM 
                         User_Restrictions
                     WHERE 
@@ -257,7 +257,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     SELECT 
-                        id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
+                        restrictions_id, user_id, login, reason, name_banned_by, created_at, expires_at, is_active 
                     FROM 
                         User_Restrictions
                     WHERE 
@@ -287,7 +287,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return new UserRestriction()
             {
-                Id = reader.GetGuid(reader.GetOrdinal("id")),
+                Id = reader.GetGuid(reader.GetOrdinal("restrictions_id")),
                 UserId = reader.GetGuid(reader.GetOrdinal("user_id")),
                 Login = reader.GetFieldValue<string>(reader.GetOrdinal("login")),
                 Reason = reader.IsDBNull(reader.GetOrdinal("reason")) ? null : reader.GetString(reader.GetOrdinal("reason")),

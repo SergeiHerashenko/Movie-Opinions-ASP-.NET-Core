@@ -24,5 +24,23 @@ namespace Authorization.Controllers
         {
             return await _authorizationService.RegistrationAsync(userRegistrationDTO);
         }
+
+        [HttpPost("login")]
+        public async Task<UserResponseDTO> Login([FromBody] UserLoginDTO userLoginDTO)
+        {
+            return await _authorizationService.LoginAsync(userLoginDTO);
+        }
+
+        [HttpPost("logout")]
+        public async Task<UserResponseDTO> Logout()
+        {
+            return await _authorizationService.LogoutAsync();
+        }
+
+        [HttpPost("refresh-token")]
+        public async Task<UserResponseDTO> RefreshSessionAsync()
+        {
+            return await _authorizationService.RefreshSessionAsync();
+        }
     }
 }

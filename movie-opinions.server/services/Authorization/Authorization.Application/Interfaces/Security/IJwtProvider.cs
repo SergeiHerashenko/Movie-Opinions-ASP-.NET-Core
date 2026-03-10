@@ -5,7 +5,7 @@ namespace Authorization.Application.Interfaces.Security
 {
     public interface IJwtProvider
     {
-        string GenerateAccessToken(UserClaimsDTO user);
+        string GenerateAccessToken(UserSessionDTO user);
 
         string GenerateRefreshToken();
 

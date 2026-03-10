@@ -4,6 +4,7 @@ using Authorization.Application.Interfaces.Repositories;
 using Authorization.Application.Interfaces.Security;
 using Authorization.Application.Interfaces.Services;
 using Authorization.Domain.Entities;
+using Contracts.Enum;
 using Microsoft.Extensions.Logging;
 
 namespace Authorization.Application.Services
@@ -28,22 +29,13 @@ namespace Authorization.Application.Services
 
         public async Task<bool> CreateUserSessionAsync(UserSessionDTO userSessionDTO)
         {
-            // 1. Готуємо модель для JWT
-            var tokenModel = new UserClaimsDTO()
-            {
-                UserId = userSessionDTO.UserId,
-                Login = userSessionDTO.Login,
-                Role = userSessionDTO.Role,
-                IsEmailConfirmed = userSessionDTO.IsEmailConfirmed
-            };
-
-            // 2. Генеруємо токени
-            var accessToken = _jwtProvider.GenerateAccessToken(tokenModel);
+            // 1. Генеруємо токени
+            var accessToken = _jwtProvider.GenerateAccessToken(userSessionDTO);
             var refreshToken = _jwtProvider.GenerateRefreshToken();
 
             _cookieProvider.SetAuthCookies(accessToken, refreshToken);
 
-            // 3. Формуємо сутність для БД
+            // 2. Формуємо сутність для БД
             var userToken = new UserToken()
             {
                 Id = Guid.NewGuid(),
@@ -53,7 +45,7 @@ namespace Authorization.Application.Services
                 CreatedAt = DateTime.UtcNow,
             };
 
-            // 4. Збереження токену в базу даних
+            // 3. Збереження токену в базу даних
             await _userTokenRepository.CreateAsync(userToken);
 
             _logger.LogInformation("Сесію створено для користувача {UserId}", userSessionDTO.UserId);
@@ -61,29 +53,29 @@ namespace Authorization.Application.Services
             return true;
         }
 
-        public async Task<bool> ValidateRefreshTokenAsync(string token)
+        public async Task<UserTokenDTO?> ValidateRefreshTokenAsync()
         {
             _logger.LogInformation("Перевірка валідності Refresh токена");
 
             // 1. Перевіряємо, чи взагалі є токен у куках
             var cookieToken = _cookieProvider.GetCookie("X-Refresh-Token");
 
-            if (string.IsNullOrEmpty(cookieToken) || cookieToken != token)
+            if (string.IsNullOrEmpty(cookieToken))
             {
                 _logger.LogWarning("Refresh токен відсутній у куках або не збігається з наданим");
 
-                return false;
+                return null;
             }
 
             // 2. Шукаємо токен у базі даних
-            var tokenResult = await _userTokenRepository.GetUserTokenAsync(token);
+            var tokenResult = await _userTokenRepository.GetUserTokenAsync(cookieToken);
 
             // 3. Якщо токена немає в БД — він невалідний
             if (tokenResult == null)
             {
                 _logger.LogWarning("Токен не знайдено в базі даних");
 
-                return false;
+                return null;
             }
 
             // 4. Перевіряємо термін дії
@@ -93,24 +85,38 @@ namespace Authorization.Application.Services
 
                 await _userTokenRepository.DeleteAsync(tokenResult.Id);
 
+                return null;
+            }
+
+            return new UserTokenDTO()
+            {
+                UserId = tokenResult.UserId
+            };
+        }
+
+        public async Task<bool> DeleteSessionAsync()
+        {
+            var cookieToken = _cookieProvider.GetCookie("X-Refresh-Token");
+
+            if (string.IsNullOrEmpty(cookieToken))
+            {
+                _logger.LogWarning("Refresh токен відсутній у куках або не збігається з наданим");
+
+                _cookieProvider.ClearAuthCookies();
+
                 return false;
             }
 
-            return true;
-        }
+            var tokenEntry = await _userTokenRepository.GetUserTokenAsync(cookieToken);
 
-        public async Task<bool> DeleteSessionAsync(string token)
-        {
-            var getToken = await _userTokenRepository.GetUserTokenAsync(token);
+            if (tokenEntry != null)
+            {
+                await _userTokenRepository.DeleteAsync(tokenEntry.Id);
+
+                _logger.LogInformation("Сесію {TokenId} видалено з бази", tokenEntry.Id);
+            }
 
             _cookieProvider.ClearAuthCookies();
-
-            if (getToken != null)
-            {
-                await _userTokenRepository.DeleteAsync(getToken.Id);
-
-                return true;
-            }
 
             return true;
         }

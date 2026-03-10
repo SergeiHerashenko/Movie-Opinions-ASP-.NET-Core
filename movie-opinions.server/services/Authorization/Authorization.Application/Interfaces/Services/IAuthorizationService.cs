@@ -9,7 +9,7 @@ namespace Authorization.Application.Interfaces.Services
 
         Task<UserResponseDTO> RegistrationAsync(UserRegistrationDTO userRegistrationDTO);
 
-        Task<bool> LogoutAsync();
+        Task<UserResponseDTO> LogoutAsync();
 
         Task<UserResponseDTO> RefreshSessionAsync();
     }

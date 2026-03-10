@@ -6,6 +6,8 @@ namespace Authorization.Application.DTO.Users
 {
     public class UserResponseDTO
     {
+        public required bool IsSuccess { get; set; }
+
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public required string? Login { get; set; }
 

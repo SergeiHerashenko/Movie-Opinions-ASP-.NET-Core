@@ -48,6 +48,7 @@ namespace Contracts.Models.Status
             public const int Unauthorized = 401;     // Треба залогінитись
             public const int Forbidden = 403;        // Немає прав
             public const int Locked = 423;           // Аккаунт заблоковано (Locked)
+            public const int Deleted = 410;           // Акаунт видалений (Deleted)
         }
 
         // Верифікація (специфічні випадки)

@@ -1,5 +1,6 @@
 ﻿using Authorization.Application.Interfaces.Repositories;
 using Authorization.Domain.Entities;
+using Authorization.Domain.Exceptions;
 using Authorization.Infrastructure.Persistence.Context.AdoNet;
 using Authorization.Infrastructure.Persistence.Repositories.Base;
 using Microsoft.Extensions.Logging;
@@ -26,7 +27,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     INSERT INTO 
-                        User_Tokens (id, user_id, refresh_token, expiration_token, created_at) 
+                        User_Tokens (token_id, user_id, refresh_token, expiration_token, created_at) 
                     VALUES
                         (@Id, @UserId, @RefreshToken, @ExpirationToken, NOW())
                     RETURNING * ";
@@ -65,7 +66,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                     DELETE FROM 
                         User_Tokens 
                     WHERE
-                        id = @Id
+                        token_id = @Id
                     RETURNING * ";
 
                 await using (var deleteTokenCommand = new NpgsqlCommand(sql, conn))
@@ -85,7 +86,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                     }
                 }
 
-                throw new Exception("Сталась помилка при видаленні токену!");
+                throw new EntityNotFoundException("Сталась помилка при видаленні токену!");
             });
         }
 
@@ -103,7 +104,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         refresh_token = @RefreshToken,
                         expiration_token = @ExpirationToken
                     WHERE 
-                        id = @Id
+                        token_id = @Id
                     RETURNING * ";
 
                 await using (var updateTokenCommand = new NpgsqlCommand(sql, conn))
@@ -126,7 +127,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                     }
                 }
 
-                throw new Exception("Сталась помилка при оновленні токену!");
+                throw new EntityNotFoundException("Сталась помилка при оновленні токену!");
             });
         }
 
@@ -138,7 +139,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     SELECT 
-                        id, user_id, refresh_token, expiration_token, created_at 
+                        token_id, user_id, refresh_token, expiration_token, created_at 
                     FROM
                         User_Tokens
                     WHERE
@@ -161,7 +162,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                     }
                 }
 
-                throw new Exception("Сталась помилка при пошуку токену!");
+                throw new EntityNotFoundException("Сталась помилка при пошуку токену!");
             });
         }
 
@@ -175,7 +176,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     SELECT 
-                        id, user_id, refresh_token, expiration_token, created_at 
+                        token_id, user_id, refresh_token, expiration_token, created_at 
                     FROM
                         User_Tokens
                     WHERE
@@ -198,7 +199,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                     }
                 }
 
-                throw new Exception("Сталась помилка при пошуку токену!");
+                throw new EntityNotFoundException("Сталась помилка при пошуку токену!");
             });
         }
 
@@ -206,7 +207,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return new UserToken()
             {
-                Id = reader.GetGuid(reader.GetOrdinal("id")),
+                Id = reader.GetGuid(reader.GetOrdinal("token_id")),
                 UserId = reader.GetGuid(reader.GetOrdinal("user_id")),
                 RefreshToken = reader["refresh_token"] as string ?? string.Empty,
                 RefreshTokenExpiration = Convert.ToDateTime(reader["expiration_token"]),

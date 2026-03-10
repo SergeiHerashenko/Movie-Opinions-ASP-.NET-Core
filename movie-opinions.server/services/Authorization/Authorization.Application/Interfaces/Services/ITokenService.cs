@@ -6,9 +6,9 @@ namespace Authorization.Application.Interfaces.Services
     {
         Task<bool> CreateUserSessionAsync(UserSessionDTO userSessionDTO);
 
-        Task<bool> ValidateRefreshTokenAsync(string token);
+        Task<UserTokenDTO?> ValidateRefreshTokenAsync();
 
-        Task<bool> DeleteSessionAsync(string token);
+        Task<bool> DeleteSessionAsync();
 
         Task ClearAllUserSessionsAsync(Guid userId);
     }

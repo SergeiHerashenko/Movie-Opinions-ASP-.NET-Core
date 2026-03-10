@@ -26,7 +26,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     INSERT INTO 
-                        Users_Deleted (id, user_id, login, reason, deleted_at) 
+                        Users_Deleted (deletion_id, user_id, login, reason, deleted_at) 
                     VALUES 
                         (@Id, @UserId, @Login, @Reason, NOW()) 
                     RETURNING * ";
@@ -103,7 +103,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         login = @Login,
                         reason = @Reason
                     WHERE 
-                        id = @Id
+                        deletion_id = @Id
                     RETURNING * ";
 
                 await using (var updateDeletedUserCommand = new NpgsqlCommand(sql, conn))
@@ -138,7 +138,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     SELECT 
-                        id, user_id, login, reason, deleted_at
+                        deletion_id, user_id, login, reason, deleted_at
                     FROM 
                         Users_Deleted
                     WHERE
@@ -173,7 +173,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                     SELECT 
-                        id, user_id, login, reason, deleted_at
+                        deletion_id, user_id, login, reason, deleted_at
                     FROM 
                         Users_Deleted
                     WHERE
@@ -204,7 +204,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return new UserDeletion()
             {
-                Id = reader.GetGuid(reader.GetOrdinal("id")),
+                Id = reader.GetGuid(reader.GetOrdinal("deletion_id")),
                 UserId = reader.GetGuid(reader.GetOrdinal("user_id")),
                 Login = reader["login"] as string ?? string.Empty,
                 Reason = reader["reason"] as string ?? string.Empty,

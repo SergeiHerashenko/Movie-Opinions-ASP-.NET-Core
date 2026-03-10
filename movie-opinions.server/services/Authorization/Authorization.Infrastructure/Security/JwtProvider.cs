@@ -17,7 +17,7 @@ namespace Authorization.Infrastructure.Security
             _configuration = configuration;
         }
 
-        public string GenerateAccessToken(UserClaimsDTO user)
+        public string GenerateAccessToken(UserSessionDTO user)
         {
             // 1. Створюємо список Claims
             var claims = new List<Claim>

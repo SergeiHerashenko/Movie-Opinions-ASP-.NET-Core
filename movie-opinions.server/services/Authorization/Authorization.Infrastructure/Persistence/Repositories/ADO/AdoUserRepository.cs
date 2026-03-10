@@ -1,5 +1,6 @@
 ﻿using Authorization.Application.Interfaces.Repositories;
 using Authorization.Domain.Entities;
+using Authorization.Domain.Enums;
 using Authorization.Domain.Exceptions;
 using Authorization.Infrastructure.Persistence.Context.AdoNet;
 using Authorization.Infrastructure.Persistence.Repositories.Base;
@@ -28,15 +29,16 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                         INSERT INTO 
-                            Users (id, login, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted) 
+                            Users (user_id, login, login_type, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted) 
                         VALUES 
-                            (@Id, @Login, @PasswordHash, @Role, NOW(), @UpdatedAt, @LastLoginAt, @IsConfirmed, @IsBlocked, @IsDeleted)
+                            (@Id, @Login, @LoginType, @PasswordHash, @Role, NOW(), @UpdatedAt, @LastLoginAt, @IsConfirmed, @IsBlocked, @IsDeleted)
                         RETURNING * ";
 
                 await using (var insertUserCommand = new NpgsqlCommand(sql, conn))
                 {
                     insertUserCommand.Parameters.AddWithValue("@Id", entity.Id);
                     insertUserCommand.Parameters.AddWithValue("@Login", entity.Login);
+                    insertUserCommand.Parameters.AddWithValue("@LoginType", entity.LoginType.ToString());
                     insertUserCommand.Parameters.AddWithValue("@PasswordHash", entity.PasswordHash);
                     insertUserCommand.Parameters.AddWithValue("@Role", entity.Role.ToString());
                     insertUserCommand.Parameters.AddWithValue("@UpdatedAt", entity.UpdatedAt ?? (object)DBNull.Value);
@@ -72,7 +74,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         DELETE FROM 
                             Users 
                         WHERE
-                            id = @Id 
+                            user_id = @Id 
                         RETURNING * ";
 
                 await using (var deletedUserCommand = new NpgsqlCommand(sql, conn))
@@ -107,6 +109,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                             Users 
                         SET 
                             login = @Login,
+                            login_type = @LoginType,
                             password_hash = @PasswordHash, 
                             user_role = @Role,
                             updated_at = @UpdatedAt,
@@ -115,13 +118,14 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                             is_blocked = @IsBlocked,
                             is_deleted = @IsDeleted 
                         WHERE 
-                            id = @Id
+                            user_id = @Id
                         RETURNING * ";
 
                 await using (var updateUserCommand = new NpgsqlCommand(sql, conn))
                 {
                     updateUserCommand.Parameters.AddWithValue("@Id", entity.Id);
                     updateUserCommand.Parameters.AddWithValue("@Login", entity.Login);
+                    updateUserCommand.Parameters.AddWithValue("@LoginType", entity.LoginType.ToString());
                     updateUserCommand.Parameters.AddWithValue("@PasswordHash", entity.PasswordHash);
                     updateUserCommand.Parameters.AddWithValue("@Role", entity.Role.ToString());
                     updateUserCommand.Parameters.AddWithValue("@UpdatedAt", entity.UpdatedAt ?? (object)DBNull.Value);
@@ -155,7 +159,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                         SELECT 
-                            id, login, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
+                            user_id, login, login_type, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
                         FROM 
                             Users 
                         WHERE 
@@ -188,11 +192,11 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                         SELECT 
-                            id, login, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
+                            user_id, login, login_type, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
                         FROM 
                             Users 
                         WHERE 
-                            id = @Id";
+                            user_id = @Id";
 
                 await using (var getUserByIdCommand = new NpgsqlCommand(sql, conn))
                 {
@@ -221,7 +225,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 
                 var sql = @"
                         SELECT 
-                            id, login, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
+                            user_id, login, login_type password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
                         FROM 
                             Users 
                         WHERE 
@@ -250,8 +254,9 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return new User()
             {
-                Id = reader.GetGuid(reader.GetOrdinal("id")),
+                Id = reader.GetGuid(reader.GetOrdinal("user_id")),
                 Login = reader["login"] as string ?? string.Empty,
+                LoginType = Enum.TryParse<LoginType>(reader["login_type"]?.ToString(), out var login) ? login : LoginType.Email,
                 PasswordHash = reader["password_hash"] as string ?? string.Empty,
                 Role = Enum.TryParse<Role>(reader["user_role"]?.ToString(), out var role) ? role : Role.User,
                 CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
