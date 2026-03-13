@@ -1,5 +1,4 @@
 using Authorization.Application;
-using Authorization.Filters;
 using Authorization.Infrastructure;
 using Authorization.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -50,11 +49,8 @@ internal class Program
             builder.Services.AddApplication();
 
             // 5. Контролери та фільтри
-            builder.Services.AddControllers(options =>
-            {
-                options.Filters.Add<ApiResponseFilter>();
-            })
-            .AddJsonOptions(options =>
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
             {
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
             });

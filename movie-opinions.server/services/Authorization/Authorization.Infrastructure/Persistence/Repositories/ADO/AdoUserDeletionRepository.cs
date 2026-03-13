@@ -1,5 +1,6 @@
 ﻿using Authorization.Application.Interfaces.Repositories;
 using Authorization.Domain.Entities;
+using Authorization.Domain.Exceptions;
 using Authorization.Infrastructure.Persistence.Context.AdoNet;
 using Authorization.Infrastructure.Persistence.Repositories.Base;
 using Microsoft.Extensions.Logging;
@@ -31,12 +32,14 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         (@Id, @UserId, @Login, @Reason, NOW()) 
                     RETURNING * ";
 
+                object DbValue(object? value) => value ?? DBNull.Value;
+
                 await using (var deletedUserCommand = new NpgsqlCommand(sql, conn))
                 {
                     deletedUserCommand.Parameters.AddWithValue("@Id", entity.Id);
                     deletedUserCommand.Parameters.AddWithValue("@UserId", entity.UserId);
                     deletedUserCommand.Parameters.AddWithValue("@Login", entity.Login);
-                    deletedUserCommand.Parameters.AddWithValue("@Reason", entity.Reason ?? (object)DBNull.Value);
+                    deletedUserCommand.Parameters.AddWithValue("@Reason", DbValue(entity.Reason));
 
                     await using (var readerDeletedUserCommand = await deletedUserCommand.ExecuteReaderAsync())
                     {
@@ -44,14 +47,17 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var newDeletedUser = MapReaderToDeleteUser(readerDeletedUserCommand);
 
-                            _logger.LogInformation("Користувач {Login}, був успішно збережений!", entity.Login);
+                            _logger.LogInformation("Видалений користувач {Login}, був успішно створений. Guid {Id}. Дата створення: {Now}",
+                                newDeletedUser.Login,
+                                newDeletedUser.Id,
+                                DateTime.UtcNow);
 
                             return newDeletedUser;
                         }
                     }
                 }
 
-                throw new Exception("Не вдалося отримати дані після вставки");
+                throw new ReturningNoDataException("Не вдалося отримати дані видаленого користувача після вставки");
             });
         }
 
@@ -78,14 +84,17 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var deletedRecordUser = MapReaderToDeleteUser(readerDeletedUserRecordCommand);
 
-                            _logger.LogInformation("Інформація користувач {id}, була успішно видалена!", id);
+                            _logger.LogInformation("Інформація видаленого користувач {Login}, була успішно видалена. Guid {Id}. Дата видалення: {Now}", 
+                                deletedRecordUser.Login,
+                                deletedRecordUser.Id,
+                                DateTime.UtcNow);
 
                             return deletedRecordUser;
                         }
                     }
                 }
 
-                throw new Exception("Сталась помилка видалення інформації з таблиці!");
+                throw new ReturningNoDataException("Сталась помилка видалення інформації з таблиці 'Видалених користувачів'.");
             });
         }
 
@@ -106,12 +115,14 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         deletion_id = @Id
                     RETURNING * ";
 
+                object DbValue(object? value) => value ?? DBNull.Value;
+
                 await using (var updateDeletedUserCommand = new NpgsqlCommand(sql, conn))
                 {
                     updateDeletedUserCommand.Parameters.AddWithValue("@Id", entity.Id);
                     updateDeletedUserCommand.Parameters.AddWithValue("@UserId", entity.UserId);
                     updateDeletedUserCommand.Parameters.AddWithValue("@Login", entity.Login);
-                    updateDeletedUserCommand.Parameters.AddWithValue("@Reason", entity.Reason ?? (object)DBNull.Value);
+                    updateDeletedUserCommand.Parameters.AddWithValue("@Reason", DbValue(entity.Reason));
 
                     await using (var readerUpdateDeletedUserCommand = await updateDeletedUserCommand.ExecuteReaderAsync())
                     {
@@ -119,18 +130,21 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var newUpdateDeletedUser = MapReaderToDeleteUser(readerUpdateDeletedUserCommand);
 
-                            _logger.LogInformation("Інформація користувач {Login}, була успішно оновлена!", entity.Login);
+                            _logger.LogInformation("Інформація користувач {Login}, була успішно оновлена. Guid {Id}. Дата оновлення: {Now}",
+                                newUpdateDeletedUser.Login,
+                                newUpdateDeletedUser.Id,
+                                DateTime.UtcNow);
 
                             return newUpdateDeletedUser;
                         }
                     }
                 }
 
-                throw new Exception("Сталась помилка оновлення інформації в таблиці!");
+                throw new ReturningNoDataException("Сталась помилка оновлення інформації в таблиці 'Видалених користувачів'.");
             });
         }
 
-        public async Task<UserDeletion> GetUserDeletionsByIdAsync(Guid userId)
+        public async Task<UserDeletion?> GetUserDeletionsByIdAsync(Guid userId)
         {
             return await ExecuteAsync(async () =>
             {
@@ -144,28 +158,28 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                     WHERE
                         user_id = @UserId ";
 
-                await using (var getDeletedUserByIdCommand = new NpgsqlCommand(sql, conn))
+                await using (var getUserDeletionByIdCommand = new NpgsqlCommand(sql, conn))
                 {
-                    getDeletedUserByIdCommand.Parameters.AddWithValue("@UserId", userId);
+                    getUserDeletionByIdCommand.Parameters.AddWithValue("@UserId", userId);
 
-                    await using (var readerGetDeletedUserByIdCommand = await getDeletedUserByIdCommand.ExecuteReaderAsync())
+                    await using (var readerDeletedUserByIdCommand = await getUserDeletionByIdCommand.ExecuteReaderAsync())
                     {
-                        if (await readerGetDeletedUserByIdCommand.ReadAsync())
+                        if (await readerDeletedUserByIdCommand.ReadAsync())
                         {
-                            var deletedRecordUser = MapReaderToDeleteUser(readerGetDeletedUserByIdCommand);
+                            var deletedRecordUser = MapReaderToDeleteUser(readerDeletedUserByIdCommand);
 
-                            _logger.LogInformation("Інформація про користувача {userId}, знайдена!", userId);
+                            _logger.LogInformation("Інформація про користувача {Login}, знайдена!", deletedRecordUser.Login);
 
                             return deletedRecordUser;
                         }
                     }
                 }
 
-                throw new Exception("Сталась помилка при видаленні інформації в таблиці!");
+                return null;
             });
         }
 
-        public async Task<UserDeletion> GetUserDeletionsByLoginAsync(string userLogin)
+        public async Task<UserDeletion?> GetUserDeletionsByLoginAsync(string userLogin)
         {
             return await ExecuteAsync(async () =>
             {
@@ -189,14 +203,14 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var deletedRecordUser = MapReaderToDeleteUser(readerGetDeletedUserByLoginCommand);
 
-                            _logger.LogInformation("Інформація про користувача {userLogin}, знайдена!", userLogin);
+                            _logger.LogInformation("Інформація про користувача {Login}, знайдена!", userLogin);
 
                             return deletedRecordUser;
                         }
                     }
                 }
 
-                throw new Exception("Сталась помилка при видаленні інформації в таблиці!");
+                return null;
             });
         }
 

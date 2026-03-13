@@ -14,11 +14,11 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
     {
         private readonly IDbConnectionProvider _dbconnectionProvider;
 
-        public AdoUserRepository(IDbConnectionProvider connectionProvider,
+        public AdoUserRepository(IDbConnectionProvider dbconnectionProvider,
             ILogger<AdoUserRepository> logger)
                 : base(logger)
         {
-            _dbconnectionProvider = connectionProvider;
+            _dbconnectionProvider = dbconnectionProvider;
         }
 
         public async Task<User> CreateAsync(User entity)
@@ -26,14 +26,16 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
             return await ExecuteAsync(async () =>
             {
                 await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
-
+            
                 var sql = @"
-                        INSERT INTO 
-                            Users (user_id, login, login_type, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted) 
-                        VALUES 
-                            (@Id, @Login, @LoginType, @PasswordHash, @Role, NOW(), @UpdatedAt, @LastLoginAt, @IsConfirmed, @IsBlocked, @IsDeleted)
-                        RETURNING * ";
-
+                    INSERT INTO 
+                        Users (user_id, login, login_type, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted) 
+                    VALUES 
+                        (@Id, @Login, @LoginType, @PasswordHash, @Role, NOW(), @UpdatedAt, @LastLoginAt, @IsConfirmed, @IsBlocked, @IsDeleted)
+                    RETURNING * ";
+            
+                object DbValue(object? value) => value ?? DBNull.Value;
+            
                 await using (var insertUserCommand = new NpgsqlCommand(sql, conn))
                 {
                     insertUserCommand.Parameters.AddWithValue("@Id", entity.Id);
@@ -41,26 +43,29 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                     insertUserCommand.Parameters.AddWithValue("@LoginType", entity.LoginType.ToString());
                     insertUserCommand.Parameters.AddWithValue("@PasswordHash", entity.PasswordHash);
                     insertUserCommand.Parameters.AddWithValue("@Role", entity.Role.ToString());
-                    insertUserCommand.Parameters.AddWithValue("@UpdatedAt", entity.UpdatedAt ?? (object)DBNull.Value);
-                    insertUserCommand.Parameters.AddWithValue("@LastLoginAt", entity.LastLoginAt ?? (object)DBNull.Value);
+                    insertUserCommand.Parameters.AddWithValue("@UpdatedAt", DbValue(entity.UpdatedAt));
+                    insertUserCommand.Parameters.AddWithValue("@LastLoginAt", DbValue(entity.LastLoginAt));
                     insertUserCommand.Parameters.AddWithValue("@IsConfirmed", false);
                     insertUserCommand.Parameters.AddWithValue("@IsBlocked", false);
                     insertUserCommand.Parameters.AddWithValue("@IsDeleted", false);
-
+            
                     await using (var readerInsertUserCommand = await insertUserCommand.ExecuteReaderAsync())
                     {
                         if (await readerInsertUserCommand.ReadAsync())
                         {
                             var newUser = MapReaderToUser(readerInsertUserCommand);
-
-                            _logger.LogInformation("Користувач {Id} збережений в базу", newUser.Id);
-
+            
+                            _logger.LogInformation("Користувач {Login} збережений в базу. Guid {Id}. Дата створення: {Now}",
+                                newUser.Login, 
+                                newUser.Id, 
+                                DateTime.UtcNow);
+            
                             return newUser;
                         }
                     }
                 }
-
-                throw new Exception("Не вдалося отримати дані після вставки");
+            
+                throw new ReturningNoDataException("Не вдалося отримати дані при створенні користувача");
             });
         }
 
@@ -87,14 +92,17 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var userEntity = MapReaderToUser(readerDeletedUserCommand);
 
-                            _logger.LogInformation("Користувача {id} успішно видалено!", id);
+                            _logger.LogInformation("Користувача {Login} успішно видалено. Guid {Id}. Дата видалення: {Now}", 
+                                userEntity.Login,
+                                userEntity.Id,
+                                DateTime.UtcNow);
 
                             return userEntity;
                         }
                     }
                 }
 
-                throw new UserNotFoundException("Користувача не знайдено, видалення не можливе");
+                throw new ReturningNoDataException("Користувача не знайдено, видалення не можливе");
             });
         }
 
@@ -121,6 +129,8 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                             user_id = @Id
                         RETURNING * ";
 
+                object DbValue(object? value) => value ?? DBNull.Value;
+
                 await using (var updateUserCommand = new NpgsqlCommand(sql, conn))
                 {
                     updateUserCommand.Parameters.AddWithValue("@Id", entity.Id);
@@ -128,8 +138,8 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                     updateUserCommand.Parameters.AddWithValue("@LoginType", entity.LoginType.ToString());
                     updateUserCommand.Parameters.AddWithValue("@PasswordHash", entity.PasswordHash);
                     updateUserCommand.Parameters.AddWithValue("@Role", entity.Role.ToString());
-                    updateUserCommand.Parameters.AddWithValue("@UpdatedAt", entity.UpdatedAt ?? (object)DBNull.Value);
-                    updateUserCommand.Parameters.AddWithValue("@LastLoginAt", entity.LastLoginAt ?? (object)DBNull.Value);
+                    updateUserCommand.Parameters.AddWithValue("@UpdatedAt", DbValue(entity.UpdatedAt));
+                    updateUserCommand.Parameters.AddWithValue("@LastLoginAt", DbValue(entity.LastLoginAt));
                     updateUserCommand.Parameters.AddWithValue("@IsConfirmed", entity.IsConfirmed);
                     updateUserCommand.Parameters.AddWithValue("@IsBlocked", entity.IsBlocked);
                     updateUserCommand.Parameters.AddWithValue("@IsDeleted", entity.IsDeleted);
@@ -140,18 +150,54 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var updateUser = MapReaderToUser(readerUpdateUserCommand);
 
-                            _logger.LogInformation("Дані користувача {Login} успішно оновлені!", updateUser.Login);
+                            _logger.LogInformation("Дані користувача {Login} успішно оновлені. Guid {Id}. Дата оновлення: {Now}", 
+                                updateUser.Login,
+                                updateUser.Id,
+                                DateTime.UtcNow);
 
                             return updateUser;
                         }
                     }
                 }
 
-                throw new Exception("Виникла помилка при оновленні інформації користувача!");
+                throw new ReturningNoDataException("Не вдалося отримати дані при оновленні користувача");
             });
         }
 
-        public async Task<User?> FindUserByLoginAsync(string userLogin)
+        public async Task<User?> GetUserByIdAsync(Guid userId)
+        {
+            return await ExecuteAsync(async () =>
+            {
+                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+
+                var sql = @"
+                        SELECT 
+                            user_id, login, login_type, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
+                        FROM 
+                            Users 
+                        WHERE 
+                            user_id = @Id";
+
+                await using (var getUserByIdCommand = new NpgsqlCommand(sql, conn))
+                {
+                    getUserByIdCommand.Parameters.AddWithValue("@Id", userId);
+
+                    await using (var readerGetUserByIdCommand = await getUserByIdCommand.ExecuteReaderAsync())
+                    {
+                        if (await readerGetUserByIdCommand.ReadAsync())
+                        {
+                            var userEntity = MapReaderToUser(readerGetUserByIdCommand);
+
+                            return userEntity;
+                        }
+                    }
+                }
+
+                return null;
+            });
+        }
+
+        public async Task<User?> GetUserByLoginAsync(string userLogin)
         {
             return await ExecuteAsync(async () =>
             {
@@ -181,72 +227,6 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                 }
 
                 return null;
-            });
-        }
-
-        public async Task<User> GetUserByIdAsync(Guid userId)
-        {
-            return await ExecuteAsync(async () =>
-            {
-                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
-
-                var sql = @"
-                        SELECT 
-                            user_id, login, login_type, password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
-                        FROM 
-                            Users 
-                        WHERE 
-                            user_id = @Id";
-
-                await using (var getUserByIdCommand = new NpgsqlCommand(sql, conn))
-                {
-                    getUserByIdCommand.Parameters.AddWithValue("@Id", userId);
-
-                    await using (var readerGetUserByIdCommand = await getUserByIdCommand.ExecuteReaderAsync())
-                    {
-                        if (await readerGetUserByIdCommand.ReadAsync())
-                        {
-                            var userEntity = MapReaderToUser(readerGetUserByIdCommand);
-
-                            return userEntity;
-                        }
-                    }
-                }
-
-                throw new UserNotFoundException("Користувача за id не знайдено");
-            });
-        }
-
-        public async Task<User> GetUserByLoginAsync(string userLogin)
-        {
-            return await ExecuteAsync(async () =>
-            {
-                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
-
-                var sql = @"
-                        SELECT 
-                            user_id, login, login_type password_hash, user_role, created_at, updated_at, last_login_at, is_confirmed, is_blocked, is_deleted 
-                        FROM 
-                            Users 
-                        WHERE 
-                            login = @Login";
-
-                await using (var getUserByLoginCommand = new NpgsqlCommand(sql, conn))
-                {
-                    getUserByLoginCommand.Parameters.AddWithValue("@Login", userLogin);
-
-                    await using (var readergetUserByLoginCommand = await getUserByLoginCommand.ExecuteReaderAsync())
-                    {
-                        if (await readergetUserByLoginCommand.ReadAsync())
-                        {
-                            var userEntity = MapReaderToUser(readergetUserByLoginCommand);
-
-                            return userEntity;
-                        }
-                    }
-                }
-
-                throw new UserNotFoundException("Користувача за логіном не знайдено");
             });
         }
 

@@ -33,12 +33,12 @@ namespace Authorization.Infrastructure.Persistence.Repositories.Dapper
             throw new NotImplementedException();
         }
 
-        public Task<UserDeletion> GetUserDeletionsByIdAsync(Guid userId)
+        public Task<UserDeletion?> GetUserDeletionsByIdAsync(Guid userId)
         {
             throw new NotImplementedException();
         }
 
-        public Task<UserDeletion> GetUserDeletionsByLoginAsync(string userLogin)
+        public Task<UserDeletion?> GetUserDeletionsByLoginAsync(string userLogin)
         {
             throw new NotImplementedException();
         }

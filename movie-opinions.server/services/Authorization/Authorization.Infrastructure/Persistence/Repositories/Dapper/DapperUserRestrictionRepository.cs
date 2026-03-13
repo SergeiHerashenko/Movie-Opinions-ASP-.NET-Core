@@ -33,7 +33,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.Dapper
             throw new NotImplementedException();
         }
 
-        public Task<UserRestriction> GetActiveBanByUserIdAsync(Guid userId)
+        public Task<UserRestriction?> GetActiveBanByUserIdAsync(Guid userId)
         {
             throw new NotImplementedException();
         }
@@ -43,7 +43,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.Dapper
             throw new NotImplementedException();
         }
 
-        public Task<UserRestriction> GetBanByIdAsync(Guid banId)
+        public Task<UserRestriction?> GetBanByIdAsync(Guid banId)
         {
             throw new NotImplementedException();
         }

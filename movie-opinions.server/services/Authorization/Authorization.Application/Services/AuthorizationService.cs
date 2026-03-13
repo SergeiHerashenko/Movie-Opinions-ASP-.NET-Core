@@ -1,6 +1,7 @@
 ﻿using Authorization.Application.DTO.Authentication.Request;
 using Authorization.Application.DTO.Context;
 using Authorization.Application.DTO.Users;
+using Authorization.Application.DTO.Users.Response;
 using Authorization.Application.Enum;
 using Authorization.Application.Interfaces.Infrastructure;
 using Authorization.Application.Interfaces.Integration;
@@ -9,9 +10,10 @@ using Authorization.Application.Interfaces.Security;
 using Authorization.Application.Interfaces.Services;
 using Authorization.Domain.Entities;
 using Authorization.Domain.Enums;
-using Authorization.Domain.Exceptions;
 using Contracts.Enum;
 using Contracts.Integration;
+using Contracts.Models.Response;
+using Contracts.Models.Status;
 using Microsoft.Extensions.Logging;
 
 namespace Authorization.Application.Services
@@ -48,41 +50,28 @@ namespace Authorization.Application.Services
             _accessService = accessService;
         }
 
-        public async Task<UserResponseDTO> LoginAsync(UserLoginDTO userLoginDTO)
+        public async Task<Result<LoginResponseDTO>> LoginAsync(UserLoginDTO userLoginDTO)
         {
             _logger.LogInformation("Вхід користувача {Login}", userLoginDTO.Login);
 
-            // 1. Перевірка на існування користувача
-            var existingUser = await _userRepository.FindUserByLoginAsync(userLoginDTO.Login);
+            // 1. Перевірка на існування користувача та перевірка паролю
+            var existingUser = await _userRepository.GetUserByLoginAsync(userLoginDTO.Login);
             
-            if(existingUser == null)
+            if(existingUser == null || !_passwordHasher.VerifyPassword(userLoginDTO.Password, existingUser.PasswordHash))
             {
-                return new UserResponseDTO()
+                return new Result<LoginResponseDTO>()
                 {
                     IsSuccess = false,
-                     Login = null,
-                     NextStep = null,
-                     Role = Role.Guest,
-                     Message = "Невірний логін або пароль!"
-                };
-            }
-            
-            // 2. Перевірка паролю
-            var isPasswordCorrect = _passwordHasher.VerifyPassword(userLoginDTO.Password, existingUser.PasswordHash);
-            
-            if (!isPasswordCorrect)
-            {
-                return new UserResponseDTO()
-                {
-                    IsSuccess = false,
-                    Login = null,
-                    NextStep = null,
-                    Role = Role.Guest,
-                    Message = "Невірний логін або пароль!"
+                    Message = "Невірний логін або пароль",
+                    StatusCode = StatusCode.Auth.Unauthorized,
+                    Data = new LoginResponseDTO()
+                    {
+                        Role = Role.Guest
+                    }
                 };
             }
 
-            // 3. Первірка доступу (якщо має блокування або видалення)
+            // 2. Первірка доступу (якщо має блокування або видалення)
             if(existingUser.IsBlocked || existingUser.IsDeleted)
             {
                 var accesUser = new UserAccessDTO()
@@ -101,6 +90,7 @@ namespace Authorization.Application.Services
                     foreach (var propertyName in isAcces.PropertiesToReset)
                     {
                         var prop = userType.GetProperty(propertyName);
+
                         if (prop != null && prop.CanWrite)
                         {
                             prop.SetValue(existingUser, false);
@@ -112,18 +102,21 @@ namespace Authorization.Application.Services
 
                 if (!isAcces.IsAllowed)
                 {
-                    return new UserResponseDTO()
+                    return new Result<LoginResponseDTO>()
                     {
                         IsSuccess = false,
-                        Login = existingUser.Login,
-                        NextStep = null,
-                        Role = Role.Guest,
-                        Message = isAcces.Message
+                        Message = isAcces.Message,
+                        StatusCode = isAcces.StatusCode,
+                        Data = new LoginResponseDTO()
+                        {
+                            Login = existingUser.Login,
+                            Role = Role.Guest
+                        }
                     };
                 }
             }
 
-            // 4. Створення токену
+            // 3. Створення токену
             var userSession = new UserSessionDTO()
             {
                 UserId = existingUser.Id,
@@ -134,26 +127,34 @@ namespace Authorization.Application.Services
 
             await _tokenService.CreateUserSessionAsync(userSession);
 
-            return new UserResponseDTO()
+            return new Result<LoginResponseDTO>()
             {
                 IsSuccess = true,
-                Login = existingUser.Login,
-                NextStep = null,
-                Role = existingUser.Role,
-                Message = "Вхід успішний"
+                Message = "Вхід успішний",
+                StatusCode = StatusCode.General.Ok,
+                Data = new LoginResponseDTO()
+                {
+                    Login = existingUser.Login,
+                    Role = existingUser.Role,
+                }
             };
         }
 
-        public async Task<UserResponseDTO> RegistrationAsync(UserRegistrationDTO userRegistrationDTO)
+        public async Task<Result<RegistrationResponseDTO>> RegistrationAsync(UserRegistrationDTO userRegistrationDTO)
         {
             _logger.LogInformation("Початок реєстрації користувача {Login}!", userRegistrationDTO.Login);
 
             // 1. Перевірка на існування користувача
-            var existingUser = await _userRepository.FindUserByLoginAsync(userRegistrationDTO.Login);
+            var existingUser = await _userRepository.GetUserByLoginAsync(userRegistrationDTO.Login);
             
             if (existingUser != null)
             {
-                throw new UserAlreadyExistsException(existingUser.Login);
+                return new Result<RegistrationResponseDTO>()
+                {
+                    IsSuccess = false,
+                    Message = "Спробуйте інший логін",
+                    StatusCode = StatusCode.Create.Conflict
+                };
             }
 
             // 2. Створення сутності
@@ -177,13 +178,11 @@ namespace Authorization.Application.Services
             
                 await _userRepository.DeleteAsync(newUser.Id);
             
-                return new UserResponseDTO()
+                return new Result<RegistrationResponseDTO>()
                 {
                     IsSuccess = false,
-                    Login = null,
                     Message = "Помилка при генерації токену. Спробуйте пізніше!",
-                    NextStep = null,
-                    Role = Role.Guest
+                    StatusCode = StatusCode.General.InternalError
                 };
             }
 
@@ -209,46 +208,47 @@ namespace Authorization.Application.Services
             
                 await _userRepository.DeleteAsync(newUser.Id);
             
-                return new UserResponseDTO()
+                return new Result<RegistrationResponseDTO>()
                 {
                     IsSuccess = false,
-                    Login = null,
                     Message = result.Message,
-                    NextStep = null,
-                    Role = Role.Guest
+                    StatusCode = StatusCode.General.InternalError
                 };
             }
 
-            return new UserResponseDTO()
+            return new Result<RegistrationResponseDTO>()
             {
                 IsSuccess = true,
-                Login = newUser.Login,
                 Message = "Реєстрація успішна!",
-                NextStep = newUser.LoginType switch
+                StatusCode = StatusCode.General.Ok,
+                Data = new RegistrationResponseDTO()
                 {
-                    LoginType.Phone => RegistrationStep.SmsCodeRequired,
-                    LoginType.Email => RegistrationStep.EmailConfirmationSent,
-                    _ => throw new ArgumentOutOfRangeException(nameof(newUser.LoginType), "Unknown login type")
-                },
-                Role = newUser.Role
+                    Login = newUser.Login,
+                    RegistrationStep = newUser.LoginType switch
+                    {
+                        LoginType.Phone => RegistrationStep.SmsCodeRequired,
+                        LoginType.Email => RegistrationStep.EmailConfirmationSent,
+                        _ => throw new ArgumentOutOfRangeException(nameof(newUser.LoginType), "Unknown login type")
+                    },
+                    Role = newUser.Role
+                }
             };
         }
 
-        public async Task<UserResponseDTO> LogoutAsync()
+        public async Task<Result<Role>> LogoutAsync()
         {
             var clearSession =  await _tokenService.DeleteSessionAsync();
 
-            return new UserResponseDTO()
+            return new Result<Role>()
             {
                 IsSuccess = true,
-                Login = null,
                 Message = "Вихід успішний!",
-                NextStep = null,
-                Role = Role.Guest
+                StatusCode = StatusCode.General.Ok,
+                Data = Role.Guest
             };
         }
 
-        public async Task<UserResponseDTO> RefreshSessionAsync()
+        public async Task<Result<LoginResponseDTO>> RefreshSessionAsync()
         {
             var refreshToken = await _tokenService.ValidateRefreshTokenAsync();
 
@@ -256,12 +256,15 @@ namespace Authorization.Application.Services
             {
                 await _tokenService.DeleteSessionAsync();
 
-                return new UserResponseDTO()
+                return new Result<LoginResponseDTO>()
                 {
                     IsSuccess = false,
-                    Login = null,
-                    Role = Role.Guest,
-                    Message = "Сесія скінчилась!"
+                    Message = "Сесія скінчилась!",
+                    StatusCode = StatusCode.Verification.Expired,
+                    Data = new LoginResponseDTO()
+                    {
+                        Role = Role.Guest
+                    }
                 };
             }
 
@@ -271,12 +274,15 @@ namespace Authorization.Application.Services
             {
                 await _tokenService.DeleteSessionAsync();
 
-                return new UserResponseDTO()
+                return new Result<LoginResponseDTO>()
                 {
                     IsSuccess = false,
-                    Login = null,
-                    Role = Role.Guest,
-                    Message = "Сесія скінчилась!"
+                    Message = "Сесія скінчилась!",
+                    StatusCode = StatusCode.Verification.Expired,
+                    Data = new LoginResponseDTO()
+                    {
+                        Role = Role.Guest
+                    }
                 };
             }
 
@@ -292,12 +298,16 @@ namespace Authorization.Application.Services
 
             await _tokenService.CreateUserSessionAsync(userSession);
 
-            return new UserResponseDTO()
+            return new Result<LoginResponseDTO>()
             {
                 IsSuccess = true,
-                Login = userSession.Login,
-                Role = entityUser.Role,
-                Message = "Сесія оновлена!"
+                Message = "Сесія оновлена!",
+                StatusCode = StatusCode.General.Ok,
+                Data = new LoginResponseDTO()
+                {
+                    Login = userSession.Login,
+                    Role = entityUser.Role,
+                }
             };
         }
 

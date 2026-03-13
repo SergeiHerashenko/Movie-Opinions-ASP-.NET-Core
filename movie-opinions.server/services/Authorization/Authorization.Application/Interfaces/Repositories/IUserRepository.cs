@@ -5,10 +5,8 @@ namespace Authorization.Application.Interfaces.Repositories
 {
     public interface IUserRepository : IBaseRepository<User>
     {
-        Task<User> GetUserByIdAsync(Guid userId);
+        Task<User?> GetUserByIdAsync(Guid userId);
 
-        Task<User> GetUserByLoginAsync(string userLogin);
-
-        Task<User?> FindUserByLoginAsync(string userLogin);
+        Task<User?> GetUserByLoginAsync(string userLogin);
     }
 }

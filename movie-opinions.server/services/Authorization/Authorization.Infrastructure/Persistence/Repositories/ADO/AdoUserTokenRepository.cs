@@ -45,14 +45,17 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var newToken = MapReaderToToken(readerCreatedTokenCommand);
 
-                            _logger.LogInformation("Токен створено для користувача {userId}!", entity.UserId);
+                            _logger.LogInformation("Токен створено для користувача {UserId}. Guid {Id}. Дата створення {Now}",
+                                newToken.UserId,
+                                newToken.Id,
+                                DateTime.UtcNow);
 
                             return newToken;
                         }
                     }
                 }
 
-                throw new Exception("Сталась помилка при створенні токену!");
+                throw new ReturningNoDataException("Не вдалося отримати дані токену після вставки");
             });
         }
 
@@ -79,14 +82,17 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var deleteToken = MapReaderToToken(readerDeleteTokenCommand);
 
-                            _logger.LogInformation("Токен успішно видалений!");
+                            _logger.LogInformation("Токен користувача {UserId} успішно видалений. Guid {Id}. Дата видалення {Now}",
+                                deleteToken.UserId,
+                                deleteToken.Id,
+                                DateTime.UtcNow);
 
                             return deleteToken;
                         }
                     }
                 }
 
-                throw new EntityNotFoundException("Сталась помилка при видаленні токену!");
+                throw new ReturningNoDataException("Сталась помилка при видаленні токену!");
             });
         }
 
@@ -120,18 +126,21 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var updateToken = MapReaderToToken(readerUpdateTokenCommand);
 
-                            _logger.LogInformation("Токен успішно оновлений для користувача {userId}!", entity.UserId);
+                            _logger.LogInformation("Токен успішно оновлений для користувача {UserId}. Guid {Id}. Дата оновлення {Now}",
+                                updateToken.UserId,
+                                updateToken.Id,
+                                DateTime.UtcNow);
 
                             return updateToken;
                         }
                     }
                 }
 
-                throw new EntityNotFoundException("Сталась помилка при оновленні токену!");
+                throw new ReturningNoDataException("Сталась помилка при оновленні токену!");
             });
         }
 
-        public async Task<UserToken> GetUserTokenAsync(string refreshToken)
+        public async Task<UserToken?> GetUserTokenAsync(string refreshToken)
         {
             return await ExecuteAsync(async () =>
             {
@@ -155,14 +164,14 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var tokenEntity = MapReaderToToken(readerGetTokenCommand);
 
-                            _logger.LogInformation("Токен знайдений!");
+                            _logger.LogInformation("Токен користувача {UserId} знайдений!", tokenEntity.UserId);
 
                             return tokenEntity;
                         }
                     }
                 }
 
-                throw new EntityNotFoundException("Сталась помилка при пошуку токену!");
+                return null;
             });
         }
 
@@ -198,8 +207,6 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         return userTokensList;
                     }
                 }
-
-                throw new EntityNotFoundException("Сталась помилка при пошуку токену!");
             });
         }
 

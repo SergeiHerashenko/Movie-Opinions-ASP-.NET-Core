@@ -5,8 +5,8 @@ namespace Authorization.Application.Interfaces.Repositories
 {
     public interface IUserDeletionRepository : IBaseRepository<UserDeletion>
     {
-        Task<UserDeletion> GetUserDeletionsByIdAsync(Guid userId);
+        Task<UserDeletion?> GetUserDeletionsByIdAsync(Guid userId);
 
-        Task<UserDeletion> GetUserDeletionsByLoginAsync(string userLogin);
+        Task<UserDeletion?> GetUserDeletionsByLoginAsync(string userLogin);
     }
 }

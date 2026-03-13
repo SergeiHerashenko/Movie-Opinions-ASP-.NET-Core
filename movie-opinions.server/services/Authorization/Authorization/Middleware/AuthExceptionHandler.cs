@@ -1,5 +1,6 @@
 ﻿using Authorization.Domain.Exceptions;
 using Contracts.Model.Response;
+using Contracts.Models.Response;
 using Microsoft.AspNetCore.Diagnostics;
 using static Contracts.Models.Status.StatusCode;
 
@@ -38,7 +39,7 @@ namespace Authorization.Middleware
             httpContext.Response.StatusCode = statusCode;
             httpContext.Response.ContentType = "application/json";
 
-            var errorResponse = new ServiceResponse()
+            var errorResponse = new Result()
             {
                 IsSuccess = false,
                 Message = message,

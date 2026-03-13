@@ -48,13 +48,13 @@ namespace Contracts.Models.Status
             public const int Unauthorized = 401;     // Треба залогінитись
             public const int Forbidden = 403;        // Немає прав
             public const int Locked = 423;           // Аккаунт заблоковано (Locked)
-            public const int Deleted = 410;           // Акаунт видалений (Deleted)
+            public const int Deleted = 410;          // Акаунт видалений (Deleted)
         }
 
         // Верифікація (специфічні випадки)
         public static class Verification
         {
-            public const int Expired = 410;          // Токен прострочений (Gone)
+            public const int Expired = 498;          // Токен прострочений (Gone)
             public const int Invalid = 422;          // Токен невірний (Unprocessable Entity)
         }
     }

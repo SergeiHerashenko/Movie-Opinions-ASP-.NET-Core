@@ -38,12 +38,12 @@ namespace Authorization.Infrastructure.Persistence.Repositories.Dapper
             throw new NotImplementedException();
         }
 
-        public Task<User> GetUserByIdAsync(Guid userId)
+        public Task<User?> GetUserByIdAsync(Guid userId)
         {
             throw new NotImplementedException();
         }
 
-        public Task<User> GetUserByLoginAsync(string userLogin)
+        public Task<User?> GetUserByLoginAsync(string userLogin)
         {
             throw new NotImplementedException();
         }

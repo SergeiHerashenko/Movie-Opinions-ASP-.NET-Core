@@ -5,7 +5,7 @@ namespace Contracts.Models.Status
 {
     public class StatusCodeJsonConverter : JsonConverter<StatusCode>
     {
-        // Читання: перетворюємо число з JSON назад у об'єкт StatusCode
+        // Читання: перетворюємо число з JSON назад у об'єкт BusinessStatus
         public override StatusCode Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             // Якщо в JSON прийшло число
@@ -30,7 +30,7 @@ namespace Contracts.Models.Status
             return new StatusCode(500);
         }
 
-        // Запис: перетворюємо об'єкт StatusCode у просте число для JSON
+        // Запис: перетворюємо об'єкт BusinessStatus у просте число для JSON
         public override void Write(Utf8JsonWriter writer, StatusCode value, JsonSerializerOptions options)
         {
             writer.WriteNumberValue((int)value); // Використовуємо implicit operator int

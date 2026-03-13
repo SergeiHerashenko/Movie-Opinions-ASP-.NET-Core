@@ -32,14 +32,16 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         (@Id, @UserId, @Login, @Reason, @NameBannedBy, NOW(), @ExpiresAt, @IsActive) 
                     RETURNING * ";
 
+                object DbValue(object? value) => value ?? DBNull.Value;
+
                 await using (var restrictionUserCommand = new NpgsqlCommand(sql, conn))
                 {
                     restrictionUserCommand.Parameters.AddWithValue("@Id", entity.Id);
                     restrictionUserCommand.Parameters.AddWithValue("@UserId", entity.UserId);
                     restrictionUserCommand.Parameters.AddWithValue("@Login", entity.Login);
-                    restrictionUserCommand.Parameters.AddWithValue("@Reason", entity.Reason ?? (object)DBNull.Value);
+                    restrictionUserCommand.Parameters.AddWithValue("@Reason", DbValue(entity.Reason));
                     restrictionUserCommand.Parameters.AddWithValue("@NameBannedBy", entity.NameBannedBy);
-                    restrictionUserCommand.Parameters.AddWithValue("@ExpiresAt", entity.ExpiresAt ?? (object)DBNull.Value);
+                    restrictionUserCommand.Parameters.AddWithValue("@ExpiresAt", DbValue(entity.ExpiresAt));
                     restrictionUserCommand.Parameters.AddWithValue("@IsActive", true);
 
                     await using (var readerRestrictionUserCommand = await restrictionUserCommand.ExecuteReaderAsync())
@@ -48,14 +50,17 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var newRecord = MapReaderToBan(readerRestrictionUserCommand);
 
-                            _logger.LogInformation("Запис про обмеження користувача {UserId} збережений в базу!", entity.UserId);
+                            _logger.LogInformation("Запис про обмеження користувача {Login} збережений в базу. Guid {Id}. Дата створення: {Now}",
+                                newRecord.Login,
+                                newRecord.Id,
+                                DateTime.UtcNow);
 
                             return newRecord;
                         }
                     }
                 }
 
-                throw new Exception("Не вдалося отримати дані після вставки");
+                throw new ReturningNoDataException("Не вдалося отримати дані заблокованого користувача після вставки");
             });
         }
 
@@ -82,14 +87,17 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var deleteRestrictionUser = MapReaderToBan(readerDeleteRestrictionUserCommand);
 
-                            _logger.LogInformation("Запис про користувача {UserId} видалено!", deleteRestrictionUser.UserId);
+                            _logger.LogInformation("Запис про користувача {Login} видалено. Guid {Id}. Дата видалення: {Now}", 
+                                deleteRestrictionUser.Login,
+                                deleteRestrictionUser.Id,
+                                DateTime.UtcNow);
 
                             return deleteRestrictionUser;
                         }
                     }
                 }
 
-                throw new EntityNotFoundException("Запис не знайдено, видалення не можливе");
+                throw new ReturningNoDataException("Запис не знайдено, видалення не можливе");
             });
         }
 
@@ -98,6 +106,8 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
             return await ExecuteAsync(async () =>
             {
                 await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+
+                object DbValue(object? value) => value ?? DBNull.Value;
 
                 var sql = @"
                     UPDATE 
@@ -118,9 +128,9 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                     updateRestrictionUserCommand.Parameters.AddWithValue("@Id", entity.Id);
                     updateRestrictionUserCommand.Parameters.AddWithValue("@UserId", entity.UserId);
                     updateRestrictionUserCommand.Parameters.AddWithValue("@Login", entity.Login);
-                    updateRestrictionUserCommand.Parameters.AddWithValue("@Reason", entity.Reason ?? (object)DBNull.Value);
+                    updateRestrictionUserCommand.Parameters.AddWithValue("@Reason", DbValue(entity.Reason));
                     updateRestrictionUserCommand.Parameters.AddWithValue("@NameBannedBy", entity.NameBannedBy);
-                    updateRestrictionUserCommand.Parameters.AddWithValue("@ExpiresAt", entity.ExpiresAt ?? (object)DBNull.Value);
+                    updateRestrictionUserCommand.Parameters.AddWithValue("@ExpiresAt", DbValue(entity.ExpiresAt));
                     updateRestrictionUserCommand.Parameters.AddWithValue("@IsActive", entity.IsActive);
 
                     await using (var readerUpdateRestrictionUserCommand = await updateRestrictionUserCommand.ExecuteReaderAsync())
@@ -129,18 +139,21 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var newUpdateRestrictionUser = MapReaderToBan(readerUpdateRestrictionUserCommand);
 
-                            _logger.LogInformation("Інформація користувача {Login} успішно оновлена!", entity.Login);
+                            _logger.LogInformation("Дані заблокованого користувача {Login} успішно оновлені. Guid {Id}. Дата оновлення: {Now}",
+                                newUpdateRestrictionUser.Login,
+                                newUpdateRestrictionUser.Id,
+                                DateTime.UtcNow);
 
                             return newUpdateRestrictionUser;
                         }
                     }
                 }
 
-                throw new EntityNotFoundException("Виникла помилка при оновленні інформації користувача!");
+                throw new ReturningNoDataException("Виникла помилка при оновленні інформації заблокованого користувача!");
             });
         }
 
-        public async Task<UserRestriction> GetActiveBanByUserIdAsync(Guid userId)
+        public async Task<UserRestriction?> GetActiveBanByUserIdAsync(Guid userId)
         {
             return await ExecuteAsync(async () =>
             {
@@ -166,14 +179,14 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var userRestriction = MapReaderToBan(readerActiveUserRestriction);
 
-                            _logger.LogInformation("Заблокований користувач {userId} знайдено!", userId);
+                            _logger.LogInformation("Заблокований користувач {Login} знайдено!", userRestriction.Login);
 
                             return userRestriction;
                         }
                     }
                 }
 
-                throw new EntityNotFoundException($"Активних блокувань для користувача не знайдено!");
+                return null;
             });
         }
 
@@ -212,7 +225,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
             });
         }
 
-        public async Task<UserRestriction> GetBanByIdAsync(Guid banId)
+        public async Task<UserRestriction?> GetBanByIdAsync(Guid banId)
         {
             return await ExecuteAsync(async () =>
             {
@@ -236,14 +249,14 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                         {
                             var restrictionEntity = MapReaderToBan(readerGetRestrictionCommand);
 
-                            _logger.LogInformation("Запис бану знайдено!");
+                            _logger.LogInformation("Запис бану знайдено. Guid {Id}", restrictionEntity.Id);
 
                             return restrictionEntity;
                         }
                     }
                 }
 
-                throw new EntityNotFoundException($"Запис бану з ID {banId} не знайдено");
+                return null;
             });
         }
 

@@ -53,7 +53,7 @@ namespace Authorization.Application.AccessChecks
                 {
                     IsAllowed = false,
                     StatusCode = StatusCode.Auth.Locked,
-                    Message = $"Користувач заблокований до: {block.ExpiresAt:dd.MM.yyyy HH:mm}"
+                    Message = $"Користувач заблокований до: {block.ExpiresAt:dd.MM.yyyy HH:mm}. Причина блокування: {block.Reason}"
                 }
             };
         }

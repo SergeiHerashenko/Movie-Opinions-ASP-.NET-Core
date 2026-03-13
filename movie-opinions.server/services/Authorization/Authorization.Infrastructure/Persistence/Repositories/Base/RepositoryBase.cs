@@ -1,4 +1,5 @@
 ﻿using Authorization.Domain.Exceptions;
+using Authorization.Infrastructure.Persistence.Context.AdoNet;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 

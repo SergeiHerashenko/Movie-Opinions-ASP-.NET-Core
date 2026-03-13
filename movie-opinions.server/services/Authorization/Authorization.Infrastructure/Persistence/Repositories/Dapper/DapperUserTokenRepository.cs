@@ -33,7 +33,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.Dapper
             throw new NotImplementedException();
         }
 
-        public Task<UserToken> GetUserTokenAsync(string refreshToken)
+        public Task<UserToken?> GetUserTokenAsync(string refreshToken)
         {
             throw new NotImplementedException();
         }
