@@ -1,16 +1,14 @@
 ﻿using Authorization.Application.DTO.Users.Change;
-using Authorization.Application.DTO.Users.Response;
+using Contracts.Models.Response;
 
 namespace Authorization.Application.Interfaces.Services
 {
     public interface IAccountService
     {
-        Task<ChangeResponseDTO> ChangePasswordAsync(ChangePasswordDTO changePasswordDTO);
+        Task<Result<InitiatePasswordChangeResponse>> InitiatePasswordChangeAsync(InitiatePasswordChangeDTO initiatePasswordChangeDTO);
 
-        Task ResetPasswordAsync();
+        Task<Result> SendVerificationCodeAsync(SendVerificationCodeDTO sendVerificationCodeDTO);
 
-        Task RequestEmailChangeAsync();
-
-        Task ConfirmEmailChangeAsync();
+        Task<Result> ConfirmPasswordChangeAsync(PasswordConfirmationDTO passwordConfirmationDTO);
     }
 }

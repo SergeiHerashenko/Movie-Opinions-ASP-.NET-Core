@@ -43,11 +43,13 @@ namespace Authorization.Infrastructure
             services.AddScoped<IProfileSender, ProfileIntegrationSender>();
             services.AddScoped<IContactsSender, ContactsIntegrationSender>();
             services.AddScoped<INotificationSender, NotificationIntegrationSender>();
+            services.AddScoped<IVerificationSender, VerificationIntegrationSender>();
 
             services.AddScoped<IRegistrationOrchestrator, RegistrationOrchestrator>();
 
             services.AddScoped<IJwtProvider, JwtProvider>();
             services.AddScoped<ICookieProvider, CookieProvider>();
+            services.AddScoped<IUserContext, UserContext>();
 
             services.AddProjectHttpClients(configuration);
 
@@ -59,8 +61,12 @@ namespace Authorization.Infrastructure
             var profileServiceUrl = configuration["ServiceUrls:ProfileService"];
             var contactsServiceUrl = configuration["ServiceUrls:ContactsService"];
             var notificationServiceUrl = configuration["ServiceUrls:NotificationService"];
+            var verificationServiceUrl = configuration["ServiceUrls:VerificationService"];
 
-            if (string.IsNullOrEmpty(profileServiceUrl) || string.IsNullOrEmpty(contactsServiceUrl) || string.IsNullOrEmpty(notificationServiceUrl))
+            if (string.IsNullOrEmpty(profileServiceUrl) || 
+                string.IsNullOrEmpty(contactsServiceUrl) || 
+                string.IsNullOrEmpty(notificationServiceUrl) ||
+                string.IsNullOrEmpty(verificationServiceUrl))
             {
                 throw new Exception("Помилка при отримані рядку підключення!");
             }
@@ -78,6 +84,11 @@ namespace Authorization.Infrastructure
             services.AddHttpClient("NotificationClient", client =>
             {
                 client.BaseAddress = new Uri(notificationServiceUrl);
+            });
+
+            services.AddHttpClient("VerificationClient", client =>
+            {
+                client.BaseAddress = new Uri(verificationServiceUrl);
             });
 
             return services;

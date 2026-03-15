@@ -13,6 +13,7 @@ namespace Authorization.Application
             services.AddScoped<IAuthorizationService, AuthorizationService>();
             services.AddScoped<ITokenService, TokenService>();
             services.AddScoped<IAccessService, AccessService>();
+            services.AddScoped<IAccountService, AccountService>();
             services.AddScoped<IAccessCheck, BlockCheck>();
             services.AddScoped<IAccessCheck, DeletionCheck>();
 

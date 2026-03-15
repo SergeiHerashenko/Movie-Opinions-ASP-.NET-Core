@@ -5,6 +5,6 @@ namespace Authorization.Application.Interfaces.Repositories
 {
     public interface IUserPendingAccountChangesRepository : IBaseRepository<UserPendingChange>
     {
-        Task<UserPendingChange> GetPendingChangesAsync(string token);
+        Task<UserPendingChange?> GetPendingChangesAsync(Guid id);
     }
 }

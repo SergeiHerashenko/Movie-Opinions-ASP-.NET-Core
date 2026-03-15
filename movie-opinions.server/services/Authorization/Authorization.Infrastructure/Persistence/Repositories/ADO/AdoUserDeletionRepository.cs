@@ -10,20 +10,20 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 {
     public class AdoUserDeletionRepository : RepositoryBase, IUserDeletionRepository
     {
-        private readonly IDbConnectionProvider _dbonnectionProvider;
+        private readonly IDbConnectionProvider _dbConnectionProvider;
 
         public AdoUserDeletionRepository(IDbConnectionProvider dbConnectionProvider,
             ILogger<AdoUserDeletionRepository> logger)
                 : base(logger)
         {
-            _dbonnectionProvider = dbConnectionProvider;
+            _dbConnectionProvider = dbConnectionProvider;
         }
 
         public async Task<UserDeletion> CreateAsync(UserDeletion entity)
         {
             return await ExecuteAsync(async () =>
             {
-                await using var conn = await _dbonnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     INSERT INTO 
@@ -65,7 +65,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return await ExecuteAsync(async () =>
             {
-                await using var conn = await _dbonnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     DELETE FROM 
@@ -102,7 +102,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return await ExecuteAsync(async () =>
             {
-                await using var conn = await _dbonnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     UPDATE 
@@ -148,7 +148,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return await ExecuteAsync(async () =>
             {
-                await using var conn = await _dbonnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     SELECT 
@@ -183,7 +183,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return await ExecuteAsync(async () =>
             {
-                await using var conn = await _dbonnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     SELECT 

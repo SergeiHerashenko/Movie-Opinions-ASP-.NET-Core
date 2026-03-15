@@ -10,20 +10,20 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 {
     public class AdoUserRestrictionRepository : RepositoryBase, IUserRestrictionRepository
     {
-        private readonly IDbConnectionProvider _dbconnectionProvider;
+        private readonly IDbConnectionProvider _dbConnectionProvider;
 
         public AdoUserRestrictionRepository(IDbConnectionProvider connectionProvider,
             ILogger<AdoUserRestrictionRepository> logger)
                 : base(logger)
         {
-            _dbconnectionProvider = connectionProvider;
+            _dbConnectionProvider = connectionProvider;
         }
 
         public async Task<UserRestriction> CreateAsync(UserRestriction entity)
         {
             return await ExecuteAsync(async () =>
             {
-                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     INSERT INTO 
@@ -68,7 +68,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return await ExecuteAsync(async () =>
             {
-                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     DELETE FROM 
@@ -105,7 +105,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return await ExecuteAsync(async () =>
             {
-                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 object DbValue(object? value) => value ?? DBNull.Value;
 
@@ -157,7 +157,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return await ExecuteAsync(async () =>
             {
-                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     SELECT 
@@ -196,7 +196,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
             {
                 var userRestrictionsList = new List<UserRestriction>();
 
-                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     SELECT 
@@ -229,7 +229,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
         {
             return await ExecuteAsync(async () =>
             {
-                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     SELECT 
@@ -266,7 +266,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
             {
                 var bannedByAdminList = new List<UserRestriction>();
 
-                await using var conn = await _dbconnectionProvider.GetOpenConnectionAsync();
+                await using var conn = await _dbConnectionProvider.GetOpenConnectionAsync();
 
                 var sql = @"
                     SELECT 

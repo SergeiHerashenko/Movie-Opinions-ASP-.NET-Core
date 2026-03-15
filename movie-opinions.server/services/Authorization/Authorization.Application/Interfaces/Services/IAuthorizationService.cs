@@ -11,7 +11,7 @@ namespace Authorization.Application.Interfaces.Services
 
         Task<Result<RegistrationResponseDTO>> RegistrationAsync(UserRegistrationDTO userRegistrationDTO);
 
-        Task<Result<Role>> LogoutAsync();
+        Task<Result<LogoutResponseDTO>> LogoutAsync();
 
         Task<Result<LoginResponseDTO>> RefreshSessionAsync();
     }

@@ -62,6 +62,7 @@ namespace Authorization.Controllers
             return HandleResult(result);
         }
 
+        [NonAction]
         protected IActionResult HandleResult<T>(Result<T> result)
         {
             if (result.IsSuccess)

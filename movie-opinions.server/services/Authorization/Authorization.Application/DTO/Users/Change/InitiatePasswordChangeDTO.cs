@@ -2,8 +2,8 @@
 
 namespace Authorization.Application.DTO.Users.Change
 {
-    public class ChangePasswordDTO
-    {
+    public class InitiatePasswordChangeDTO 
+    { 
         public required string OldPassword { get; set; }
 
         [MinLength(6, ErrorMessage = "Пароль має бути не менше 6 символів")]

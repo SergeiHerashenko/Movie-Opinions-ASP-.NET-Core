@@ -1,4 +1,5 @@
 ﻿using Authorization.Application.DTO.Integration;
+using Authorization.Application.DTO.Integration.Responses;
 using Contracts.Model.Response;
 
 namespace Authorization.Application.Interfaces.ExternalServices
@@ -10,5 +11,7 @@ namespace Authorization.Application.Interfaces.ExternalServices
         Task<ServiceResponse> SendDeleteContactRequestAsync(Guid userId);
 
         Task<ServiceResponse> SendUpdateContactRequestAsync(ContactIntegrationDTO contactCreateIntegrationDTO);
+
+        Task<ServiceResponse<IEnumerable<ContactResponseDTO>>> GetUserChannelsAsync(Guid userId);
     }
 }

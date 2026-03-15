@@ -33,7 +33,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.Dapper
             throw new NotImplementedException();
         }
 
-        public Task<UserPendingChange> GetPendingChangesAsync(string token)
+        public Task<UserPendingChange?> GetPendingChangesAsync(Guid id)
         {
             throw new NotImplementedException();
         }

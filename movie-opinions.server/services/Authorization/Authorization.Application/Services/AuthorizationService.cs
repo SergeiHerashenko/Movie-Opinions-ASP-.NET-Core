@@ -127,6 +127,11 @@ namespace Authorization.Application.Services
 
             await _tokenService.CreateUserSessionAsync(userSession);
 
+            // 4. Оновлення останнього входу користувача
+            existingUser.LastLoginAt = DateTime.UtcNow;
+
+            await _userRepository.UpdateAsync(existingUser);
+
             return new Result<LoginResponseDTO>()
             {
                 IsSuccess = true,
@@ -235,16 +240,19 @@ namespace Authorization.Application.Services
             };
         }
 
-        public async Task<Result<Role>> LogoutAsync()
+        public async Task<Result<LogoutResponseDTO>> LogoutAsync()
         {
             var clearSession =  await _tokenService.DeleteSessionAsync();
 
-            return new Result<Role>()
+            return new Result<LogoutResponseDTO>()
             {
                 IsSuccess = true,
                 Message = "Вихід успішний!",
                 StatusCode = StatusCode.General.Ok,
-                Data = Role.Guest
+                Data = new LogoutResponseDTO()
+                {
+                    Role = Role.Guest
+                }
             };
         }
 
