@@ -15,8 +15,14 @@ namespace Authorization.Infrastructure.Identity
 
         public string? GetUserLogin()
         {
-            return _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Email)?.Value
-                          ?? _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value;
+            return _httpContextAccessor.HttpContext?.User?.FindFirst("email")?.Value;
+        }
+
+        public Guid? GetUserId()
+        {
+            string? userId = _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value;
+
+            return userId != null ? Guid.Parse(userId) : null;
         }
     }
 }

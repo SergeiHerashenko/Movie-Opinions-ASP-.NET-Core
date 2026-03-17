@@ -3,5 +3,7 @@
     public interface IUserContext
     {
         string? GetUserLogin();
+
+        Guid? GetUserId();
     }
 }

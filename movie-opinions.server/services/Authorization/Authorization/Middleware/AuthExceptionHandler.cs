@@ -43,7 +43,7 @@ namespace Authorization.Middleware
             {
                 IsSuccess = false,
                 Message = message,
-                StatusCode = statusCode,
+                StatusCode = statusCode
             };
 
             await httpContext.Response.WriteAsJsonAsync(errorResponse, cancellationToken);

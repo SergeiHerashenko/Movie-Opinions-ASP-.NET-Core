@@ -18,28 +18,28 @@ namespace Authorization.Infrastructure.ExternalServices
             _sendInternalRequest = sendInternalRequest;
         }
 
-        public async Task<ServiceResponse<string>> GetCode(Guid userId)
+        public async Task<ServiceResponse<string>> GetCode(Guid requestId)
         {
             var verificationRequest = new InternalRequest<object>()
             {
                 ClientName = "VerificationClient",
-                Endpoint = $"api/varification/get-code/{userId}",
+                Endpoint = $"api/varification/get-code/{requestId}",
                 Method = HttpMethod.Get,
             };
 
-            return await ExecuteVerificationRequestAsync<object, string>(verificationRequest, userId);
+            return await ExecuteVerificationRequestAsync<object, string>(verificationRequest, requestId);
         }
 
         private async Task<ServiceResponse<TResponse>> ExecuteVerificationRequestAsync<TBody, TResponse>(
             InternalRequest<TBody> request,
-            Guid userId)
+            Guid requestId)
         {
             var responseVerification = await _sendInternalRequest.SendAsync<TBody, TResponse>(request);
 
             if (!responseVerification.IsSuccess)
             {
-                _logger.LogError("Помилка отримання коду для користувача {UserId}. Статус: {StatusCode}",
-                    userId,
+                _logger.LogError("Помилка отримання коду для запису {RequestId}. Статус: {StatusCode}",
+                    requestId,
                     responseVerification.StatusCode);
 
                 return new ServiceResponse<TResponse>

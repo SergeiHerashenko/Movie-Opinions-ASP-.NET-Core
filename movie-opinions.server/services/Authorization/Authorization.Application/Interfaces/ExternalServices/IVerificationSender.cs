@@ -4,6 +4,6 @@ namespace Authorization.Application.Interfaces.ExternalServices
 {
     public interface IVerificationSender
     {
-        Task<ServiceResponse<string>> GetCode(Guid userId);
+        Task<ServiceResponse<string>> GetCode(Guid requestId);
     }
 }

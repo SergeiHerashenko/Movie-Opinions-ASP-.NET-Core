@@ -2,7 +2,6 @@
 using Authorization.Application.DTO.Integration.Responses;
 using Authorization.Application.DTO.Users.Change;
 using Authorization.Application.Interfaces.ExternalServices;
-using Authorization.Application.Interfaces.Infrastructure;
 using Authorization.Application.Interfaces.Repositories;
 using Authorization.Application.Interfaces.Security;
 using Authorization.Application.Interfaces.Services;
@@ -16,78 +15,49 @@ namespace Authorization.Application.Services
 {
     public class AccountService : IAccountService
     {
-        private readonly IUserContext _userContext;
         private readonly IUserRepository _userRepository;
-        private readonly IPasswordHasher _passwordHasher;
+        private readonly IHasher _hasher;
         private readonly IUserPendingAccountChangesRepository _userPendingAccountChangesRepository;
         private readonly IContactsSender _contactsSender;
         private readonly INotificationSender _notificationSender;
         private readonly IVerificationSender _verificationSender;
+        private readonly IMaskContact _maskContact;
+        private readonly IValidatorService _validatorService;
 
-        public AccountService(IUserContext userContext,
-            IUserRepository userRepository,
-            IPasswordHasher passwordHasher,
+        public AccountService(IUserRepository userRepository,
+            IHasher hasher,
             IUserPendingAccountChangesRepository userPendingAccountChangesRepository,
             IContactsSender contactsSender,
             INotificationSender notificationSender,
-            IVerificationSender verificationSender)
+            IVerificationSender verificationSender,
+            IMaskContact maskContact,
+            IValidatorService validatorService)
         {
-            _userContext = userContext;
             _userRepository = userRepository;
-            _passwordHasher = passwordHasher;
+            _hasher = hasher;
             _userPendingAccountChangesRepository = userPendingAccountChangesRepository;
             _contactsSender = contactsSender;
             _notificationSender = notificationSender;
             _verificationSender = verificationSender;
+            _maskContact = maskContact;
+            _validatorService = validatorService;
         }
 
         public async Task<Result<InitiatePasswordChangeResponse>> InitiatePasswordChangeAsync(InitiatePasswordChangeDTO initiatePasswordChangeDTO)
         {
-            string? loginUser = _userContext.GetUserLogin();
+            var resultValidate = await _validatorService.ValidateForUser(initiatePasswordChangeDTO.OldPassword, initiatePasswordChangeDTO.NewPassword);
 
-            if(string.IsNullOrEmpty(loginUser))
+            if(!resultValidate.IsSuccess)
             {
                 return new Result<InitiatePasswordChangeResponse>()
                 {
-                    IsSuccess = false,
-                    Message = "Помилка отримання логіну користувача!",
-                    StatusCode = StatusCode.Auth.Unauthorized
+                    IsSuccess = resultValidate.IsSuccess,
+                    Message = resultValidate.Message,
+                    StatusCode = resultValidate.StatusCode
                 };
             }
 
-            var userEntity = await _userRepository.GetUserByLoginAsync(loginUser);
-
-            if (userEntity == null)
-            {
-                return new Result<InitiatePasswordChangeResponse>()
-                {
-                    IsSuccess = false,
-                    Message = "Помилка отримання логіну користувача!",
-                    StatusCode = StatusCode.General.NotFound
-                };
-            }
-
-            if (userEntity.IsBlocked)
-            {
-                return new Result<InitiatePasswordChangeResponse>()
-                {
-                    IsSuccess = false,
-                    Message = "КОристувач заблокований!",
-                    StatusCode = StatusCode.Auth.Locked
-                };
-            }
-
-            if(!_passwordHasher.VerifyPassword(initiatePasswordChangeDTO.OldPassword, userEntity.PasswordHash))
-            {
-                return new Result<InitiatePasswordChangeResponse>()
-                {
-                    IsSuccess = false,
-                    Message = "Невірний пароль!",
-                    StatusCode = StatusCode.General.BadRequest
-                };
-            }
-
-            var contactsResponse = await _contactsSender.GetUserChannelsAsync(userEntity.Id);
+            var contactsResponse = await _contactsSender.GetUserChannelsAsync(resultValidate.Data);
 
             if (!contactsResponse.IsSuccess)
             {
@@ -99,22 +69,24 @@ namespace Authorization.Application.Services
                 };
             }
 
-            var createChangeEntity = CreateEntity(initiatePasswordChangeDTO.NewPassword, userEntity.Id);
+            var (createChangeEntity, token) = CreateEntity(initiatePasswordChangeDTO.NewPassword, resultValidate.Data);
 
             var saveChangeEntity = await _userPendingAccountChangesRepository.CreateAsync(createChangeEntity);
 
             return new Result<InitiatePasswordChangeResponse>()
             {
                 IsSuccess = true,
-                Message = "Пароль вірний",
+                Message = "Запит на зміну пароля створено!",
                 StatusCode = StatusCode.General.Ok,
+
                 Data = new InitiatePasswordChangeResponse()
                 {
                     RequestId = saveChangeEntity.Id,
+                    ConfirmationToken = token,
                     CommunicationChannel = contactsResponse.Data!.Select(c => new ContactResponseDTO
                     {
                         UserId = c.UserId,
-                        ContactValue = MaskContactValue(c.ContactValue, c.CommunicationChannel),
+                        ContactValue = _maskContact.MaskContactValue(c.ContactValue, c.CommunicationChannel),
                         CommunicationChannel = c.CommunicationChannel
                     }).ToList()
                 }
@@ -123,19 +95,21 @@ namespace Authorization.Application.Services
 
         public async Task<Result> SendVerificationCodeAsync(SendVerificationCodeDTO sendVerificationCodeDTO)
         {
-            var entity = await _userPendingAccountChangesRepository.GetPendingChangesAsync(sendVerificationCodeDTO.RequestId);
+            var resultValidate = await _validatorService.ValidateForSend(sendVerificationCodeDTO.RequestId, sendVerificationCodeDTO.ConfirmationToken);
 
-            if(entity == null || entity.ExpiresAt < DateTime.UtcNow)
+            if (!resultValidate.IsSuccess)
             {
                 return new Result()
                 {
-                    IsSuccess = false,
-                    Message = "Час зміни вийшов!",
-                    StatusCode = StatusCode.General.BadRequest
+                    IsSuccess = resultValidate.IsSuccess,
+                    Message = resultValidate.Message,
+                    StatusCode = resultValidate.StatusCode
                 };
             }
 
-            var contactsResponse = await _contactsSender.GetUserChannelsAsync(entity.UserId);
+            var userId = resultValidate.Data;
+
+            var contactsResponse = await _contactsSender.GetUserChannelsAsync(userId);
 
             if (!contactsResponse.IsSuccess || contactsResponse.Data == null)
             {
@@ -162,7 +136,7 @@ namespace Authorization.Application.Services
 
             var notificationEntity = new NotificationIntegrationDTO()
             {
-                UserId = entity.UserId,
+                UserId = userId,
                 Recipient = selectedContact.ContactValue,
                 Action = MessageActions.PasswordChange,
                 Channel = sendVerificationCodeDTO.CommunicationChannel
@@ -200,19 +174,19 @@ namespace Authorization.Application.Services
                 };
             }
 
-            var entity = await _userPendingAccountChangesRepository.GetPendingChangesAsync(passwordConfirmationDTO.RequestId);
+            var resultValidate = await _validatorService.ValidateForConfirm(passwordConfirmationDTO.RequestId, passwordConfirmationDTO.ConfirmationToken);
 
-            if (entity == null || entity.ExpiresAt < DateTime.UtcNow)
+            if (!resultValidate.IsSuccess || resultValidate.Data == null)
             {
                 return new Result()
                 {
-                    IsSuccess = false,
-                    Message = "Час зміни вийшов!",
-                    StatusCode = StatusCode.General.BadRequest
+                    IsSuccess = resultValidate.IsSuccess,
+                    Message = resultValidate.Message,
+                    StatusCode = resultValidate.StatusCode
                 };
             }
 
-            var code = await _verificationSender.GetCode(entity.UserId);
+            var code = await _verificationSender.GetCode(passwordConfirmationDTO.RequestId);
 
             if (!code.IsSuccess || code.Data == null)
             {
@@ -224,7 +198,7 @@ namespace Authorization.Application.Services
                 };
             }
 
-            if (!_passwordHasher.VerifyPassword(code.Data, passwordConfirmationDTO.Code))
+            if (!_hasher.Verify(code.Data, passwordConfirmationDTO.Code))
             {
                 return new Result()
                 {
@@ -234,7 +208,7 @@ namespace Authorization.Application.Services
                 };
             }
 
-            var entityUser = await _userRepository.GetUserByIdAsync(entity.UserId);
+            var entityUser = await _userRepository.GetUserByIdAsync(resultValidate.Data.UserId);
 
             if (entityUser == null)
             {
@@ -246,11 +220,21 @@ namespace Authorization.Application.Services
                 };
             }
 
-            entityUser.PasswordHash = entity.NewPasswordHash!;
-            entityUser.UpdatedAt = DateTime.UtcNow;
-            entity.IsConfirmed = true;
+            if (resultValidate.Data.NewPasswordHash is not string newHash)
+            {
+                return new Result()
+                {
+                    IsSuccess = false,
+                    Message = "Дані запиту пошкоджені!",
+                    StatusCode = StatusCode.General.BadRequest
+                };
+            }
 
-            await _userPendingAccountChangesRepository.UpdateAsync(entity);
+            entityUser.PasswordHash = resultValidate.Data.NewPasswordHash;
+            entityUser.UpdatedAt = DateTime.UtcNow;
+            resultValidate.Data.IsConfirmed = true;
+
+            await _userPendingAccountChangesRepository.UpdateAsync(resultValidate.Data);
             await _userRepository.UpdateAsync(entityUser);
 
             return new Result()
@@ -261,59 +245,59 @@ namespace Authorization.Application.Services
             };
         }
 
-        private UserPendingChange CreateEntity(string newPassword, Guid userId)
+        public async Task<Result<ResetPasswordResponse>> ResetPasswordAsync(string login)
+        {
+            //var userEntity = await _userRepository.GetUserByLoginAsync(login);
+            //
+            //if(userEntity == null)
+            //{
+            //    return new Result<ResetPasswordResponse>()
+            //    {
+            //        IsSuccess = false,
+            //        Message = $"Лист надіслано на {login}. Будь-ласка перевірте пошту для подальших кроків!",
+            //        StatusCode = StatusCode.General.Ok
+            //    };
+            //}
+            //
+            //var result = userEntity switch
+            //{
+            //    var e when e.LoginType == LoginType.Email => 
+            //};
+            throw new Exception("Упс!");
+        }
+
+        private (UserPendingChange entity, string token) CreateEntity(string newPassword, Guid userId)
         {
             string confirmationToken = GenerateToken();
 
-            string passwordHash = _passwordHasher.HashPassword(newPassword);
+            string confirmationTokenHash = _hasher.Hash(confirmationToken);
 
-            return new UserPendingChange()
+            string passwordHash = _hasher.Hash(newPassword);
+
+            var entity =  new UserPendingChange()
             {
                 Id = Guid.NewGuid(),
                 UserId = userId,
-                ConfirmationToken = confirmationToken,
+                ConfirmationToken = confirmationTokenHash,
                 UserChangeType = UserChangeType.PasswordChange,
                 NewPasswordHash = passwordHash,
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(30),
                 IsConfirmed = false
             };
+
+            return (entity, confirmationToken);
         }
 
         private string GenerateToken()
         {
-            var randomNumber = new byte[64];
+            var randomNumber = new byte[32];
 
             using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
 
             rng.GetBytes(randomNumber);
 
             return Convert.ToBase64String(randomNumber);
-        }
-
-        private string MaskContactValue(string value, CommunicationChannel channel)
-        {
-            if (string.IsNullOrEmpty(value)) return value;
-
-            if (channel == CommunicationChannel.Email)
-            {
-                var parts = value.Split('@');
-                if (parts.Length < 2) return value;
-
-                string name = parts[0];
-                string domain = parts[1];
-
-                if (name.Length <= 2) return $"{name[0]}***@{domain}";
-
-                return $"{name.Substring(0, 2)}****{name.Substring(name.Length - 1)}@{domain}";
-            }
-            else if (channel == CommunicationChannel.Phone)
-            {
-                if (value.Length < 4) return value;
-                return $"{value.Substring(0, value.Length - 4)}****{value.Substring(value.Length - 2)}";
-            }
-
-            return value;
         }
     }
 }

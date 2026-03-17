@@ -6,6 +6,8 @@ namespace Authorization.Application.DTO.Users.Change
     {
         public Guid RequestId { get; set; }
 
+        public required string ConfirmationToken { get; set; }
+
         public List<ContactResponseDTO>? CommunicationChannel { get; set; } 
     }
 }

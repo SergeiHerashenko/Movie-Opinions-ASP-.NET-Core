@@ -2,7 +2,6 @@
 using Authorization.Application.DTO.Users;
 using Authorization.Application.Interfaces.Access;
 using Authorization.Application.Interfaces.Services;
-using Contracts.Model.Response;
 using Contracts.Models.Status;
 
 namespace Authorization.Application.Services

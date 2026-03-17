@@ -25,7 +25,7 @@ namespace Authorization.Application.Services
 
         private readonly IUserRepository _userRepository;
 
-        private readonly IPasswordHasher _passwordHasher;
+        private readonly IHasher _hasher;
         private readonly IRegistrationOrchestrator _orchestrator;
         private readonly IContactTypeDetector _contactTypeDetector;
 
@@ -35,7 +35,7 @@ namespace Authorization.Application.Services
         public AuthorizationService(
             IUserRepository userRepository,
             ILogger<AuthorizationService> logger,
-            IPasswordHasher passwordHasher,
+            IHasher hasher,
             IRegistrationOrchestrator orchestrator,
             IContactTypeDetector contactTypeDetector,
             ITokenService tokenService,
@@ -43,7 +43,7 @@ namespace Authorization.Application.Services
         {
             _userRepository = userRepository;
             _logger = logger;
-            _passwordHasher = passwordHasher;
+            _hasher = hasher;
             _orchestrator = orchestrator;
             _contactTypeDetector = contactTypeDetector;
             _tokenService = tokenService;
@@ -57,7 +57,7 @@ namespace Authorization.Application.Services
             // 1. Перевірка на існування користувача та перевірка паролю
             var existingUser = await _userRepository.GetUserByLoginAsync(userLoginDTO.Login);
             
-            if(existingUser == null || !_passwordHasher.VerifyPassword(userLoginDTO.Password, existingUser.PasswordHash))
+            if(existingUser == null || !_hasher.Verify(userLoginDTO.Password, existingUser.PasswordHash))
             {
                 return new Result<LoginResponseDTO>()
                 {
@@ -321,7 +321,7 @@ namespace Authorization.Application.Services
 
         private User CreateNewUserEntity(UserRegistrationDTO userRegister)
         {
-            string encryptionPassword = _passwordHasher.HashPassword(userRegister.Password);
+            string encryptionPassword = _hasher.Hash(userRegister.Password);
 
             LoginType typeLogin = _contactTypeDetector.GetLoginType(userRegister.Login);
 

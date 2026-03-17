@@ -25,7 +25,7 @@ namespace Authorization.Infrastructure.Security
                 // Використовуємо JwtRegisteredClaimNames для стандартизації
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Login),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()), // Унікальний ID токена
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.Role, user.Role.ToString()),
         
                 new Claim("email_confirmed", user.IsEmailConfirmed.ToString().ToLower()),

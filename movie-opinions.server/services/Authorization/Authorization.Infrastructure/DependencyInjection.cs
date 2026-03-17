@@ -32,7 +32,7 @@ namespace Authorization.Infrastructure
             services.AddScoped<IUserPendingAccountChangesRepository, AdoUserPendingAccountChangesRepository>();
 
             // Реалізація 
-            services.AddScoped<IPasswordHasher, PasswordHasher>();
+            services.AddScoped<IHasher, Hasher>();
             services.AddScoped<ISendInternalRequest, SendInternalRequest>();
             services.AddScoped<IContactTypeDetector, ContactTypeDetector>();
 
@@ -50,6 +50,7 @@ namespace Authorization.Infrastructure
             services.AddScoped<IJwtProvider, JwtProvider>();
             services.AddScoped<ICookieProvider, CookieProvider>();
             services.AddScoped<IUserContext, UserContext>();
+            services.AddScoped<IMaskContact, MaskContact>();
 
             services.AddProjectHttpClients(configuration);
 

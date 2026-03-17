@@ -16,6 +16,7 @@ namespace Authorization.Application
             services.AddScoped<IAccountService, AccountService>();
             services.AddScoped<IAccessCheck, BlockCheck>();
             services.AddScoped<IAccessCheck, DeletionCheck>();
+            services.AddScoped<IValidatorService, ValidatorService>();
 
             return services;
         }
