@@ -24,6 +24,14 @@ namespace Authorization.Infrastructure.Http
             {
                 var client = _httpClientFactory.CreateClient(internalRequest.ClientName);
 
+                if (internalRequest.Headers != null)
+                {
+                    foreach (var header in internalRequest.Headers)
+                    {
+                        client.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
+                    }
+                }
+
                 // 1. Відправка запиту
                 HttpResponseMessage response = internalRequest.Method.Method.ToUpper() switch
                 {

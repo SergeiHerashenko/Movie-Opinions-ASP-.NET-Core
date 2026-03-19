@@ -1,11 +1,12 @@
 ﻿using Authorization.Application.DTO.Users;
 using Authorization.Application.Interfaces.Http;
 using Authorization.Application.Interfaces.Repositories;
-using Authorization.Application.Interfaces.Security;
+using Authorization.Application.Interfaces.Security.JWT;
 using Authorization.Application.Interfaces.Services;
 using Authorization.Domain.Entities;
 using Contracts.Enum;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
 
 namespace Authorization.Application.Services
 {
@@ -14,24 +15,24 @@ namespace Authorization.Application.Services
         private readonly ILogger<TokenService> _logger;
         private readonly IUserTokenRepository _userTokenRepository;
         private readonly ICookieProvider _cookieProvider;
-        private readonly IJwtProvider _jwtProvider;
+        private readonly IUserJwtProvider _userJwtProvider;
 
         public TokenService(IUserTokenRepository userTokenRepository,
             ICookieProvider cookieProvider,
             ILogger<TokenService> logger,
-            IJwtProvider jwtProvider)
+            IUserJwtProvider jwtProvider)
         {
             _userTokenRepository = userTokenRepository;
             _cookieProvider = cookieProvider;
             _logger = logger;
-            _jwtProvider = jwtProvider;
+            _userJwtProvider = jwtProvider;
         }
 
         public async Task<bool> CreateUserSessionAsync(UserSessionDTO userSessionDTO)
         {
             // 1. Генеруємо токени
-            var accessToken = _jwtProvider.GenerateAccessToken(userSessionDTO);
-            var refreshToken = _jwtProvider.GenerateRefreshToken();
+            var accessToken = _userJwtProvider.GenerateAccessToken(userSessionDTO);
+            var refreshToken = _userJwtProvider.GenerateRefreshToken();
 
             _cookieProvider.SetAuthCookies(accessToken, refreshToken);
 
@@ -85,6 +86,26 @@ namespace Authorization.Application.Services
 
                 await _userTokenRepository.DeleteAsync(tokenResult.Id);
 
+                return null;
+            }
+
+            // 5. Перевіряемо користувача з бази з користувачем що записано у куках
+            var accessToken = _userJwtProvider.GetPrincipalFromExpiredToken(_cookieProvider.GetCookie("X-Access-Token"));
+
+            var userId = accessToken.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? accessToken.FindFirst("sub")?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("UserId не знайдено в токені");
+                return null;
+            }
+
+            var userGuid = Guid.Parse(userId);
+
+            if (userGuid != tokenResult.UserId)
+            {
+                _logger.LogWarning("Id користувачі не збігаються!");
                 return null;
             }
 

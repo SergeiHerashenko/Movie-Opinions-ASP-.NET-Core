@@ -4,6 +4,8 @@
     {
         PasswordChange = 0,
 
-        LoginChange = 1
+        PasswordReset = 1,
+
+        LoginChange = 2
     }
 }

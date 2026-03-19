@@ -1,9 +1,10 @@
 ﻿using Authorization.Domain.Enums;
+using Contracts.Models.Response;
 
 namespace Authorization.Application.Interfaces.Infrastructure
 {
     public interface IContactTypeDetector
     {
-        LoginType GetLoginType(string login);
+        Result<LoginType> GetLoginType(string login);
     }
 }

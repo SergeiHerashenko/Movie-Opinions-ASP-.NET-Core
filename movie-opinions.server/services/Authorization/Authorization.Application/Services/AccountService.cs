@@ -2,6 +2,7 @@
 using Authorization.Application.DTO.Integration.Responses;
 using Authorization.Application.DTO.Users.Change;
 using Authorization.Application.Interfaces.ExternalServices;
+using Authorization.Application.Interfaces.Infrastructure;
 using Authorization.Application.Interfaces.Repositories;
 using Authorization.Application.Interfaces.Security;
 using Authorization.Application.Interfaces.Services;
@@ -10,6 +11,7 @@ using Authorization.Domain.Enums;
 using Contracts.Integration;
 using Contracts.Models.Response;
 using Contracts.Models.Status;
+using Microsoft.Extensions.Logging;
 
 namespace Authorization.Application.Services
 {
@@ -23,6 +25,8 @@ namespace Authorization.Application.Services
         private readonly IVerificationSender _verificationSender;
         private readonly IMaskContact _maskContact;
         private readonly IValidatorService _validatorService;
+        private readonly IContactTypeDetector _contactTypeDetector;
+        private readonly ILogger<AccessService> _logger;
 
         public AccountService(IUserRepository userRepository,
             IHasher hasher,
@@ -31,7 +35,9 @@ namespace Authorization.Application.Services
             INotificationSender notificationSender,
             IVerificationSender verificationSender,
             IMaskContact maskContact,
-            IValidatorService validatorService)
+            IValidatorService validatorService,
+            IContactTypeDetector contactTypeDetector,
+            ILogger<AccessService> logger)
         {
             _userRepository = userRepository;
             _hasher = hasher;
@@ -41,6 +47,8 @@ namespace Authorization.Application.Services
             _verificationSender = verificationSender;
             _maskContact = maskContact;
             _validatorService = validatorService;
+            _contactTypeDetector = contactTypeDetector;
+            _logger = logger;
         }
 
         public async Task<Result<InitiatePasswordChangeResponse>> InitiatePasswordChangeAsync(InitiatePasswordChangeDTO initiatePasswordChangeDTO)
@@ -69,7 +77,7 @@ namespace Authorization.Application.Services
                 };
             }
 
-            var (createChangeEntity, token) = CreateEntity(initiatePasswordChangeDTO.NewPassword, resultValidate.Data);
+            var (createChangeEntity, token) = CreateEntity(resultValidate.Data, UserChangeType.PasswordChange, newPassword: initiatePasswordChangeDTO.NewPassword);
 
             var saveChangeEntity = await _userPendingAccountChangesRepository.CreateAsync(createChangeEntity);
 
@@ -247,40 +255,97 @@ namespace Authorization.Application.Services
 
         public async Task<Result<ResetPasswordResponse>> ResetPasswordAsync(string login)
         {
-            //var userEntity = await _userRepository.GetUserByLoginAsync(login);
-            //
-            //if(userEntity == null)
-            //{
-            //    return new Result<ResetPasswordResponse>()
-            //    {
-            //        IsSuccess = false,
-            //        Message = $"Лист надіслано на {login}. Будь-ласка перевірте пошту для подальших кроків!",
-            //        StatusCode = StatusCode.General.Ok
-            //    };
-            //}
-            //
-            //var result = userEntity switch
-            //{
-            //    var e when e.LoginType == LoginType.Email => 
-            //};
+            var typeLogin = _contactTypeDetector.GetLoginType(login);
+
+            var loginType = typeLogin.IsSuccess ? typeLogin.Data : LoginType.Email;
+
+            var step = loginType switch
+            {
+                LoginType.Email => Enum.ResetPasswordStep.EmailSend,
+                LoginType.Phone => Enum.ResetPasswordStep.SmsCodeRequired,
+                _ => Enum.ResetPasswordStep.EmailSend
+            };
+
+            var channel = loginType switch
+            {
+                LoginType.Email => CommunicationChannel.Email,
+                LoginType.Phone => CommunicationChannel.Phone,
+                _ => CommunicationChannel.Email
+            };
+
+            var entityUser = await _userRepository.GetUserByLoginAsync(login);
+
+            // Генеруємо фейковий Id користувача для імітації роботи методу ( захист від атак підбору логінів )
+            var (createChangeEntity, token) = CreateEntity(entityUser?.Id ?? Guid.NewGuid(), UserChangeType.PasswordReset);
+
+            if(entityUser != null)
+            {
+                await _userPendingAccountChangesRepository.CreateAsync(createChangeEntity);
+
+                var notificationEntity = new NotificationIntegrationDTO()
+                {
+                    UserId = entityUser!.Id,
+                    Recipient = login,
+                    Action = MessageActions.PasswordReset,
+                    Channel = channel
+                };
+
+                var notificationResponse = await _notificationSender.SendCreateNotificationAsync(notificationEntity);
+
+                if (!notificationResponse.IsSuccess)
+                {
+                    _logger.LogCritical("Сервіс сповіщення не відповідає");
+                }
+            }
+            else
+            {
+                // Імітація затримки відправки
+                _ = _hasher.Hash(token);
+                await Task.Delay(Random.Shared.Next(120, 300));
+            }
+
+            return new Result<ResetPasswordResponse>()
+            {
+                IsSuccess = true,
+                Message = "Якщо обліковий запис існує, інструкції було надіслано",
+                StatusCode = StatusCode.General.Ok,
+                Data = new ResetPasswordResponse()
+                {
+                    ResetPasswordStep = step,
+                    ConfirmationToken = token,
+                    RequestId = createChangeEntity.Id
+                }
+            };
+        }
+
+        public Task<Result> VerifyResetCodeAsync()
+        {
+            // Заглушка
             throw new Exception("Упс!");
         }
 
-        private (UserPendingChange entity, string token) CreateEntity(string newPassword, Guid userId)
+        public Task<Result> FinalizePasswordResetAsync()
+        {
+            // Заглушка
+            throw new Exception("Упс!");
+        }
+
+        private (UserPendingChange entity, string token) CreateEntity(Guid userId, UserChangeType userChangeType, string? newPassword = null, string? newLogin = null)
         {
             string confirmationToken = GenerateToken();
 
             string confirmationTokenHash = _hasher.Hash(confirmationToken);
 
-            string passwordHash = _hasher.Hash(newPassword);
+            //string passwordHash = _hasher.Hash(newPassword);
 
             var entity =  new UserPendingChange()
             {
                 Id = Guid.NewGuid(),
                 UserId = userId,
                 ConfirmationToken = confirmationTokenHash,
-                UserChangeType = UserChangeType.PasswordChange,
-                NewPasswordHash = passwordHash,
+                UserChangeType = userChangeType,
+                NewPasswordHash = newPassword != null ? _hasher.Hash(newPassword) : null,
+                NewLogin = newLogin,
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(30),
                 IsConfirmed = false

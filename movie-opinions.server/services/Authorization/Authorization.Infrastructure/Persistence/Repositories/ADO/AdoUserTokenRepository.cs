@@ -189,7 +189,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
                     FROM
                         User_Tokens
                     WHERE
-                        id = @Id ";
+                        user_id = @Id ";
 
                 await using (var getTokenCommand = new NpgsqlCommand(sql, conn))
                 {

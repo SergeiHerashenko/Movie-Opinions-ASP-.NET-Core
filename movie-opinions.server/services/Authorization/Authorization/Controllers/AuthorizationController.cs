@@ -53,7 +53,7 @@ namespace Authorization.Controllers
         }
 
         [HttpPost("refresh-token")]
-        public async Task<IActionResult> RefreshSessionAsync()
+        public async Task<IActionResult> RefreshSession()
         {
             _logger.LogInformation("Оновлення токену користувача");
 

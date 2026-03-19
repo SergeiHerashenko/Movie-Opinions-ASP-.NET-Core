@@ -1,18 +1,18 @@
 ﻿using Authorization.Application.DTO.Users;
-using Authorization.Application.Interfaces.Security;
+using Authorization.Application.Interfaces.Security.JWT;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace Authorization.Infrastructure.Security
+namespace Authorization.Infrastructure.Security.JWT
 {
-    public class JwtProvider : IJwtProvider
+    public class UserJwtProvider : IUserJwtProvider
     {
         private readonly IConfiguration _configuration;
 
-        public JwtProvider(IConfiguration configuration)
+        public UserJwtProvider(IConfiguration configuration)
         {
             _configuration = configuration;
         }

@@ -54,6 +54,16 @@ namespace Authorization.Controllers
             return HandleResult(result);
         }
 
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword(string login)
+        {
+            _logger.LogInformation("Відновлення паролю!");
+
+            var result = await _accountService.ResetPasswordAsync(login);
+
+            return HandleResult(result);
+        }
+
         [NonAction]
         protected IActionResult HandleResult(Result result)
         {

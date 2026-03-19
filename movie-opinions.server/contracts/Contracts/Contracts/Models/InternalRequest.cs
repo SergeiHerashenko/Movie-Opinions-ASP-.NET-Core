@@ -9,5 +9,7 @@
         public TBody? Body { get; set; }
 
         public required HttpMethod Method { get; set; }
+
+        public Dictionary<string, string>? Headers { get; set; }
     }
 }

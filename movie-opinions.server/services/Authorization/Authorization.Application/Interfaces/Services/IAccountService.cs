@@ -12,5 +12,9 @@ namespace Authorization.Application.Interfaces.Services
         Task<Result> ConfirmPasswordChangeAsync(PasswordConfirmationDTO passwordConfirmationDTO);
 
         Task<Result<ResetPasswordResponse>> ResetPasswordAsync(string login);
+
+        Task<Result> VerifyResetCodeAsync();
+
+        Task<Result> FinalizePasswordResetAsync();
     }
 }

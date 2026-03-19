@@ -3,6 +3,7 @@ using Authorization.Application.DTO.Context;
 using Authorization.Application.DTO.Users;
 using Authorization.Application.DTO.Users.Response;
 using Authorization.Application.Enum;
+using Authorization.Application.Interfaces.Http;
 using Authorization.Application.Interfaces.Infrastructure;
 using Authorization.Application.Interfaces.Integration;
 using Authorization.Application.Interfaces.Repositories;
@@ -22,13 +23,10 @@ namespace Authorization.Application.Services
     {
         
         private readonly ILogger<AuthorizationService> _logger;
-
         private readonly IUserRepository _userRepository;
-
         private readonly IHasher _hasher;
         private readonly IRegistrationOrchestrator _orchestrator;
         private readonly IContactTypeDetector _contactTypeDetector;
-
         private readonly ITokenService _tokenService;
         private readonly IAccessService _accessService;
 
@@ -323,13 +321,13 @@ namespace Authorization.Application.Services
         {
             string encryptionPassword = _hasher.Hash(userRegister.Password);
 
-            LoginType typeLogin = _contactTypeDetector.GetLoginType(userRegister.Login);
+            var typeLogin = _contactTypeDetector.GetLoginType(userRegister.Login);
 
             return new User()
             {
                 Id = Guid.NewGuid(),
                 Login = userRegister.Login,
-                LoginType = typeLogin,
+                LoginType = typeLogin.Data,
                 PasswordHash = encryptionPassword,
                 Role = Role.User,
                 CreatedAt = DateTime.UtcNow,

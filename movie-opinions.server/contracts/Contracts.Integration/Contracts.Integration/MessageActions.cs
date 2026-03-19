@@ -6,14 +6,16 @@
 
         PasswordChange = 1,
 
-        EmailUpdate = 2,
+        PasswordReset = 2,
 
-        NewComment = 3,
+        EmailUpdate = 3,
 
-        LikeReceived = 4,
+        NewComment = 4,
 
-        NewsUpdate = 5,
+        LikeReceived = 5,
 
-        SpecialOffer =6
+        NewsUpdate = 6,
+
+        SpecialOffer = 7
     }
 }

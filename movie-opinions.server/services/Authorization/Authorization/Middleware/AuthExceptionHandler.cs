@@ -1,5 +1,4 @@
 ﻿using Authorization.Domain.Exceptions;
-using Contracts.Model.Response;
 using Contracts.Models.Response;
 using Microsoft.AspNetCore.Diagnostics;
 using static Contracts.Models.Status.StatusCode;

@@ -4,6 +4,7 @@ using Authorization.Application.Interfaces.Infrastructure;
 using Authorization.Application.Interfaces.Integration;
 using Authorization.Application.Interfaces.Repositories;
 using Authorization.Application.Interfaces.Security;
+using Authorization.Application.Interfaces.Security.JWT;
 using Authorization.Infrastructure.ExternalServices;
 using Authorization.Infrastructure.Http;
 using Authorization.Infrastructure.Identity;
@@ -12,6 +13,7 @@ using Authorization.Infrastructure.Integration.Step;
 using Authorization.Infrastructure.Persistence.Context.AdoNet;
 using Authorization.Infrastructure.Persistence.Repositories.ADO;
 using Authorization.Infrastructure.Security;
+using Authorization.Infrastructure.Security.JWT;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -47,7 +49,8 @@ namespace Authorization.Infrastructure
 
             services.AddScoped<IRegistrationOrchestrator, RegistrationOrchestrator>();
 
-            services.AddScoped<IJwtProvider, JwtProvider>();
+            services.AddScoped<IUserJwtProvider, UserJwtProvider>();
+            services.AddScoped<IServiceJwtProvider, ServiceJwtProvider>();
             services.AddScoped<ICookieProvider, CookieProvider>();
             services.AddScoped<IUserContext, UserContext>();
             services.AddScoped<IMaskContact, MaskContact>();

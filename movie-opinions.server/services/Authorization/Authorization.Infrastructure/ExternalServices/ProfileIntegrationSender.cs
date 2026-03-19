@@ -1,6 +1,7 @@
 ﻿using Authorization.Application.DTO.Integration;
 using Authorization.Application.Interfaces.ExternalServices;
 using Authorization.Application.Interfaces.Http;
+using Authorization.Application.Interfaces.Security.JWT;
 using Contracts.Model.Response;
 using Contracts.Models;
 using Microsoft.Extensions.Logging;
@@ -10,23 +11,32 @@ namespace Authorization.Infrastructure.ExternalServices
     public class ProfileIntegrationSender : IProfileSender
     {
         private readonly ISendInternalRequest _sendInternalRequest;
+        private readonly IServiceJwtProvider _serviceJwtProvider;
         private readonly ILogger<ProfileIntegrationSender> _logger;
 
         public ProfileIntegrationSender(ISendInternalRequest sendInternalRequest,
-            ILogger<ProfileIntegrationSender> logger)
+            ILogger<ProfileIntegrationSender> logger,
+            IServiceJwtProvider serviceJwtProvider)
         {
             _sendInternalRequest = sendInternalRequest;
             _logger = logger;
+            _serviceJwtProvider = serviceJwtProvider;
         }
 
         public async Task<ServiceResponse> SendCreateProfileRequestAsync(ProfileIntegrationDTO profileIntegrationDTO)
         {
+            var token = _serviceJwtProvider.GenerateServiceToken("authorization-service", new[] { "profile:create" });
+
             var profileRequest = new InternalRequest<ProfileIntegrationDTO>
             {
                 ClientName = "ProfileClient",
                 Endpoint = "api/profile/create",
                 Method = HttpMethod.Post,
-                Body = profileIntegrationDTO
+                Body = profileIntegrationDTO,
+                Headers = new Dictionary<string, string>()
+                {
+                    { "Authorization", $"Bearer {token}" }
+                }
             };
             
             return await ExecuteProfileRequestAsync(profileRequest, profileIntegrationDTO.UserId, "Створення");

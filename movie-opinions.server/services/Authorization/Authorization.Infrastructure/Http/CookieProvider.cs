@@ -25,7 +25,7 @@ namespace Authorization.Infrastructure.Http
                 Expires = DateTime.UtcNow.AddDays(-1)
             };
 
-            context.Response.Cookies.Delete("jwt", cookieOptions);
+            context.Response.Cookies.Delete("X-Access-Token", cookieOptions);
             context.Response.Cookies.Delete("X-Refresh-Token", cookieOptions);
         }
 
@@ -47,7 +47,7 @@ namespace Authorization.Infrastructure.Http
             var response = _httpContextAccessor.HttpContext?.Response;
             if (response == null) return;
 
-            response.Cookies.Append("jwt", accessToken,
+            response.Cookies.Append("X-Access-Token", accessToken,
                 new CookieOptions(cookieOptions) { Expires = DateTime.UtcNow.AddMinutes(15) });
 
             response.Cookies.Append("X-Refresh-Token", refreshToken,
