@@ -1,6 +1,7 @@
 using Microsoft.IdentityModel.Tokens;
 using Profile.Application;
 using Profile.Infrastructure;
+using Profile.Middleware;
 using Serilog;
 using System.Text;
 
@@ -54,7 +55,12 @@ internal class Program
                 });
             });
 
+            builder.Services.AddExceptionHandler<AuthExceptionHandler>();
+            builder.Services.AddProblemDetails();
+
             var app = builder.Build();
+
+            app.UseExceptionHandler();
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())

@@ -1,7 +1,8 @@
 ﻿using Contracts.Models.Response;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Profile.Application.Interfaces;
+using Profile.Application.DTO.Users;
+using Profile.Application.Interfaces.Service;
 using Status = Contracts.Models.Status.StatusCode;
 
 namespace Profile.Controllers
@@ -22,11 +23,11 @@ namespace Profile.Controllers
 
         [HttpPost("create")]
         [Authorize(Policy = "ServiceProfileCreate")]
-        public async Task<IActionResult> CreateProfile()
+        public async Task<IActionResult> CreateProfile(CreateUserProfileDTO createUserProfileDTO)
         {
             _logger.LogInformation("Створення профілю користувача");
 
-            var result = await _profileService.ProfileCreateAsync();
+            var result = await _profileService.ProfileCreateAsync(createUserProfileDTO);
 
             return HandleResult(result);
         }

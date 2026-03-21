@@ -7,6 +7,8 @@ namespace Authorization.Application.Interfaces.Security.JWT
     {
         string GenerateAccessToken(UserSessionDTO user);
 
+        string GenerateTemporaryAccessToken(Guid requestId);
+
         string GenerateRefreshToken();
 
         ClaimsPrincipal GetPrincipalFromExpiredToken(string token);

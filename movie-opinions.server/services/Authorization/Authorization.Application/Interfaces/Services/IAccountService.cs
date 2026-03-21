@@ -13,8 +13,8 @@ namespace Authorization.Application.Interfaces.Services
 
         Task<Result<ResetPasswordResponse>> ResetPasswordAsync(string login);
 
-        Task<Result> VerifyResetCodeAsync();
+        Task<Result<string>> VerifyResetCodeAsync(VerifyResetDTO verifyResetDTO);
 
-        Task<Result> FinalizePasswordResetAsync();
+        Task<Result> FinalizePasswordResetAsync(FinalizePasswordResetDTO finalizePasswordResetDTO);
     }
 }

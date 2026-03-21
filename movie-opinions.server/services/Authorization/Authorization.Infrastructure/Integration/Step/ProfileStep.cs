@@ -16,6 +16,7 @@ namespace Authorization.Infrastructure.Integration.Step
             {
                 UserId = context.UserId,
                 Login = context.Login,
+                Role = context.Role
             });
         }
 

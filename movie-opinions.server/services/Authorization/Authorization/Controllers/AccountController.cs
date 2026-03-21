@@ -64,6 +64,26 @@ namespace Authorization.Controllers
             return HandleResult(result);
         }
 
+        [HttpPost("varify-code")]
+        public async Task<IActionResult> VerificatioCodeAsync(VerifyResetDTO verifyResetDTO)
+        {
+            _logger.LogInformation("Перевірка коду підтвердження");
+
+            var result = await _accountService.VerifyResetCodeAsync(verifyResetDTO);
+
+            return HandleResult(result);
+        }
+
+        [HttpPost("save-reset-password")]
+        public async Task<IActionResult> SaveResetPassword(FinalizePasswordResetDTO finalizePasswordResetDTO)
+        {
+            _logger.LogInformation("Збереження паролю!");
+
+            var result = await _accountService.FinalizePasswordResetAsync(finalizePasswordResetDTO);
+
+            return HandleResult(result);
+        }
+
         [NonAction]
         protected IActionResult HandleResult(Result result)
         {

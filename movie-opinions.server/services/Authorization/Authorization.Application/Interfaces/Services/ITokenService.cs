@@ -6,6 +6,8 @@ namespace Authorization.Application.Interfaces.Services
     {
         Task<bool> CreateUserSessionAsync(UserSessionDTO userSessionDTO);
 
+        string CreateTemporaryToken(Guid requestId);
+
         Task<UserTokenDTO?> ValidateRefreshTokenAsync();
 
         Task<bool> DeleteSessionAsync();

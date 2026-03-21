@@ -11,6 +11,8 @@ namespace Authorization.Infrastructure.Security.JWT
     public class UserJwtProvider : IUserJwtProvider
     {
         private readonly IConfiguration _configuration;
+        private const int TIME_LIFE_TOKEN_ACCESS = 15;
+        private const int TIME_LIFE_TOKEN_TEMPORARY = 10;
 
         public UserJwtProvider(IConfiguration configuration)
         {
@@ -19,7 +21,7 @@ namespace Authorization.Infrastructure.Security.JWT
 
         public string GenerateAccessToken(UserSessionDTO user)
         {
-            // 1. Створюємо список Claims
+            // Створюємо список Claims
             var claims = new List<Claim>
             {
                 // Використовуємо JwtRegisteredClaimNames для стандартизації
@@ -31,28 +33,7 @@ namespace Authorization.Infrastructure.Security.JWT
                 new Claim("email_confirmed", user.IsEmailConfirmed.ToString().ToLower()),
             };
 
-            // 2. Отримуємо ключ із конфігурації
-            var jwtKey = _configuration["Jwt:Key"];
-
-            if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
-            {
-                throw new Exception("Критична помилка: JWT Key занадто короткий або відсутній!");
-            }
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            // 3. Створюємо сам токен
-            var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(15),
-                signingCredentials: creds
-            );
-
-            // 4. Повертаємо серіалізований рядок
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            return GenerateToken(claims, TIME_LIFE_TOKEN_ACCESS);
         }
 
         public string GenerateRefreshToken()
@@ -64,6 +45,18 @@ namespace Authorization.Infrastructure.Security.JWT
             rng.GetBytes(randomNumber);
 
             return Convert.ToBase64String(randomNumber);
+        }
+
+        public string GenerateTemporaryAccessToken(Guid requestId)
+        {
+            // Створюємо список Claims
+            var claims = new List<Claim>()
+            {
+                new Claim("reset_event_id", requestId.ToString()),
+                new Claim("purpose", "reset")
+            };
+
+            return GenerateToken(claims, TIME_LIFE_TOKEN_TEMPORARY);
         }
 
         public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
@@ -94,6 +87,32 @@ namespace Authorization.Infrastructure.Security.JWT
                 throw new SecurityTokenException("Невалідний токен");
 
             return principal;
+        }
+
+        private string GenerateToken(IEnumerable<Claim> claims, int lifeTimeToken)
+        {
+            // 1. Отримуємо ключ із конфігурації
+            var jwtKey = _configuration["Jwt:Key"];
+
+            if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
+            {
+                throw new Exception("Критична помилка: JWT Key занадто короткий або відсутній!");
+            }
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            // 2. Створюємо сам токен
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(lifeTimeToken),
+                signingCredentials: creds
+            );
+
+            // 3. Повертаємо серіалізований рядок
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }

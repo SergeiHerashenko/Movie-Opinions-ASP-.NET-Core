@@ -1,6 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Profile.Application.Interfaces;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Profile.Application.Interfaces.Service;
 using Profile.Application.Services;
 
 namespace Profile.Application

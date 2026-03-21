@@ -5,5 +5,7 @@
         string? GetUserLogin();
 
         Guid? GetUserId();
+
+        Guid? GetResetEventId();
     }
 }

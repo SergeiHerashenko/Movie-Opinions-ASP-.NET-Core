@@ -1,8 +1,8 @@
 ﻿using Contracts.Enum;
 
-namespace Authorization.Application.DTO.Integration
+namespace Profile.Application.DTO.Users
 {
-    public class ProfileIntegrationDTO
+    public class CreateUserProfileDTO
     {
         public Guid UserId { get; set; }
 

@@ -18,7 +18,7 @@ namespace Authorization.Infrastructure.ExternalServices
             _sendInternalRequest = sendInternalRequest;
         }
 
-        public async Task<ServiceResponse<string>> GetCode(Guid requestId)
+        public async Task<ServiceResponse<string>> GetCodeAsync(Guid requestId)
         {
             var verificationRequest = new InternalRequest<object>()
             {
@@ -28,6 +28,19 @@ namespace Authorization.Infrastructure.ExternalServices
             };
 
             return await ExecuteVerificationRequestAsync<object, string>(verificationRequest, requestId);
+        }
+
+        public async Task<ServiceResponse> UpdateAsync(Guid requestId, bool isConfirm)
+        {
+            var verificationRequest = new InternalRequest<bool>()
+            {
+                ClientName = "VerificationClient",
+                Endpoint = $"api/varification/update/{requestId}",
+                Method = HttpMethod.Post,
+                Body = isConfirm
+            };
+
+            return await ExecuteVerificationRequestAsync<bool, object>(verificationRequest, requestId);
         }
 
         private async Task<ServiceResponse<TResponse>> ExecuteVerificationRequestAsync<TBody, TResponse>(

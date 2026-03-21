@@ -194,6 +194,7 @@ namespace Authorization.Application.Services
             {
                 UserId = newUser.Id,
                 Login = newUser.Login,
+                Role = newUser.Role,
                 Channel = newUser.LoginType switch
                 {
                     LoginType.Phone => CommunicationChannel.Phone,

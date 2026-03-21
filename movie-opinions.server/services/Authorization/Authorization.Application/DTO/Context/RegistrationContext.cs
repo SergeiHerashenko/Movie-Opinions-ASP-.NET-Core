@@ -1,4 +1,5 @@
-﻿using Contracts.Integration;
+﻿using Contracts.Enum;
+using Contracts.Integration;
 
 namespace Authorization.Application.DTO.Context
 {
@@ -7,6 +8,8 @@ namespace Authorization.Application.DTO.Context
         public Guid UserId { get; set; }
 
         public required string Login {  get; set; }
+
+        public Role Role { get; set; }
 
         public CommunicationChannel Channel { get; set; }
 

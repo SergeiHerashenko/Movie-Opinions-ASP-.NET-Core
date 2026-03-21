@@ -24,5 +24,12 @@ namespace Authorization.Infrastructure.Identity
 
             return userId != null ? Guid.Parse(userId) : null;
         }
+
+        public Guid? GetResetEventId()
+        {
+            string? eventId = _httpContextAccessor.HttpContext?.User?.FindFirst("reset_event_id")?.Value;
+
+            return eventId != null ? Guid.Parse(eventId) : null;
+        }
     }
 }

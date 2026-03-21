@@ -153,5 +153,10 @@ namespace Authorization.Application.Services
 
             _cookieProvider.ClearAuthCookies();
         }
+
+        public string CreateTemporaryToken(Guid requestId)
+        {
+            return _userJwtProvider.GenerateTemporaryAccessToken(requestId);
+        }
     }
 }

@@ -26,7 +26,9 @@ namespace Authorization.Application.Services
         private readonly IMaskContact _maskContact;
         private readonly IValidatorService _validatorService;
         private readonly IContactTypeDetector _contactTypeDetector;
-        private readonly ILogger<AccessService> _logger;
+        private readonly ITokenService _tokenService;
+        private readonly IUserContext _userContext;
+        private readonly ILogger<AccountService> _logger;
 
         public AccountService(IUserRepository userRepository,
             IHasher hasher,
@@ -37,7 +39,9 @@ namespace Authorization.Application.Services
             IMaskContact maskContact,
             IValidatorService validatorService,
             IContactTypeDetector contactTypeDetector,
-            ILogger<AccessService> logger)
+            ILogger<AccountService> logger,
+            ITokenService tokenService,
+            IUserContext userContext)
         {
             _userRepository = userRepository;
             _hasher = hasher;
@@ -49,6 +53,8 @@ namespace Authorization.Application.Services
             _validatorService = validatorService;
             _contactTypeDetector = contactTypeDetector;
             _logger = logger;
+            _tokenService = tokenService;
+            _userContext = userContext;
         }
 
         public async Task<Result<InitiatePasswordChangeResponse>> InitiatePasswordChangeAsync(InitiatePasswordChangeDTO initiatePasswordChangeDTO)
@@ -194,7 +200,7 @@ namespace Authorization.Application.Services
                 };
             }
 
-            var code = await _verificationSender.GetCode(passwordConfirmationDTO.RequestId);
+            var code = await _verificationSender.GetCodeAsync(passwordConfirmationDTO.RequestId);
 
             if (!code.IsSuccess || code.Data == null)
             {
@@ -318,16 +324,118 @@ namespace Authorization.Application.Services
             };
         }
 
-        public Task<Result> VerifyResetCodeAsync()
+        public async Task<Result<string>> VerifyResetCodeAsync(VerifyResetDTO verifyResetDTO)
         {
-            // Заглушка
-            throw new Exception("Упс!");
+            if (string.IsNullOrEmpty(verifyResetDTO.Code))
+            {
+                return new Result<string>()
+                {
+                    IsSuccess = false,
+                    Message = "Недійсний код",
+                    StatusCode = StatusCode.General.BadRequest
+                };
+            }
+
+            var resultChang = await _userPendingAccountChangesRepository.GetPendingChangesAsync(verifyResetDTO.RequestId);
+
+            if (resultChang == null)
+            {
+                return new Result<string>()
+                {
+                    IsSuccess = false,
+                    Message = "Помилка верифікації користувача!",
+                    StatusCode = StatusCode.General.NotFound
+                };
+            }
+
+            var code = await _verificationSender.GetCodeAsync(verifyResetDTO.RequestId);
+            
+            if (!code.IsSuccess || code.Data == null)
+            {
+                return new Result<string>()
+                {
+                    IsSuccess = false,
+                    Message = "Помилка сервісу верифікації!",
+                    StatusCode = StatusCode.General.BadRequest
+                };
+            }
+
+            if (!_hasher.Verify(code.Data, verifyResetDTO.Code))
+            {
+                return new Result<string>()
+                {
+                    IsSuccess = false,
+                    Message = "Недійсний код",
+                    StatusCode = StatusCode.General.BadRequest
+                };
+            }
+
+            await _verificationSender.UpdateAsync(resultChang.Id, true);
+
+            var temporaryToken = _tokenService.CreateTemporaryToken(resultChang.Id);
+
+            return new Result<string>()
+            {
+                IsSuccess = true,
+                Message = "Код вірний!",
+                StatusCode = StatusCode.General.Ok,
+                Data = temporaryToken
+            };
         }
 
-        public Task<Result> FinalizePasswordResetAsync()
+        public async Task<Result> FinalizePasswordResetAsync(FinalizePasswordResetDTO finalizePasswordResetDTO)
         {
-            // Заглушка
-            throw new Exception("Упс!");
+            var requestId = _userContext.GetResetEventId();
+
+            if (requestId == null)
+            {
+                return new Result()
+                {
+                    IsSuccess = false,
+                    Message = "Помилка отримання ідентифікатора користувача!",
+                    StatusCode = StatusCode.General.BadRequest
+                };
+            }
+
+            var changeEntity = await _userPendingAccountChangesRepository.GetPendingChangesAsync(requestId.Value);
+
+            if (changeEntity == null)
+            {
+                return new Result()
+                {
+                    IsSuccess = false,
+                    Message = "Помилка отримання ідентифікатора користувача!",
+                    StatusCode = StatusCode.General.BadRequest
+                };
+            }
+
+            var userEntity = await _userRepository.GetUserByIdAsync(changeEntity.UserId);
+
+            if(userEntity == null)
+            {
+                return new Result()
+                {
+                    IsSuccess = false,
+                    Message = "Помилка ідентифікатора користувача!",
+                    StatusCode = StatusCode.General.NotFound
+                };
+            }
+
+            var passwordHash = _hasher.Hash(finalizePasswordResetDTO.NewPassword);
+
+            userEntity.PasswordHash = passwordHash;
+            changeEntity.IsConfirmed = true;
+
+            await _userRepository.UpdateAsync(userEntity);
+
+            await _userPendingAccountChangesRepository.UpdateAsync(changeEntity);
+
+            return new Result()
+            {
+                IsSuccess = true,
+                Message = "Пароль оновлений!",
+                StatusCode = StatusCode.General.Ok
+            };
         }
 
         private (UserPendingChange entity, string token) CreateEntity(Guid userId, UserChangeType userChangeType, string? newPassword = null, string? newLogin = null)

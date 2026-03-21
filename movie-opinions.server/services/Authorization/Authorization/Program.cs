@@ -27,6 +27,7 @@ internal class Program
 
             // 2. Валідація критичних налаштувань (Fail-fast)
             var jwtKey = builder.Configuration["Jwt:Key"];
+
             if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
             {
                 throw new InvalidOperationException("JWT Key is missing or too short (min 32 chars)!");
