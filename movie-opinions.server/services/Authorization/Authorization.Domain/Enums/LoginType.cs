@@ -2,8 +2,8 @@
 {
     public enum LoginType
     {
-        Phone =0,
+        Login_Phone = 0,
 
-        Email = 1
+        Login_Email = 1
     }
 }
