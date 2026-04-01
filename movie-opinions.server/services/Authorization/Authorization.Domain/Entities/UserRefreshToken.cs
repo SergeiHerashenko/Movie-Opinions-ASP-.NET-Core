@@ -1,5 +1,6 @@
 ﻿using Authorization.Domain.Common;
 using Authorization.Domain.Exceptions;
+using Authorization.Domain.Exceptions.DomainErrorCode;
 using Authorization.Domain.ValueObjects;
 
 namespace Authorization.Domain.Entities
@@ -41,7 +42,7 @@ namespace Authorization.Domain.Entities
             IsRevoked = false;
         }
 
-        internal UserRefreshToken(Guid id,
+        public UserRefreshToken(Guid id,
             Guid userId,
             string refreshToken,
             DeviceInfo deviceInfo,
@@ -66,10 +67,10 @@ namespace Authorization.Domain.Entities
         public static UserRefreshToken CreateRefreshToken(Guid userId, string refreshToken, DeviceInfo deviceInfo, string ipAddress, string? city)
         {
             if (string.IsNullOrWhiteSpace(refreshToken))
-                throw new DomainException(DomainErrorCodes.OperationNotAllowed, "Помилка отримування токену");
+                throw new BadRequestException(DomainErrorCodes.TokenInvalid, "Токен не може бути порожнім.");
 
             if (userId == Guid.Empty)
-                throw new DomainException(DomainErrorCodes.OperationNotAllowed, "Помилка ідентифікації користувача!");
+                throw new BadRequestException(DomainErrorCodes.OperationNotAllowed, "Помилка ідентифікації користувача.");
 
             return new UserRefreshToken(userId, refreshToken, deviceInfo, ipAddress, city);
         }
@@ -83,7 +84,7 @@ namespace Authorization.Domain.Entities
         public void Use()
         {
             if (!IsActive)
-                throw new DomainException(DomainErrorCodes.OperationNotAllowed, "Токен вже недійсний");
+                throw new UnauthorizedException(DomainErrorCodes.TokenExpired, "Токен вже недійсний");
             IsUsed = true;
         }
 

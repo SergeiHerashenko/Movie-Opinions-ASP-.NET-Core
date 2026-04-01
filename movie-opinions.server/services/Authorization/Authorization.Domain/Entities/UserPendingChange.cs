@@ -1,6 +1,7 @@
 ﻿using Authorization.Domain.Common;
 using Authorization.Domain.Enums;
 using Authorization.Domain.Exceptions;
+using Authorization.Domain.Exceptions.DomainErrorCode;
 using Authorization.Domain.ValueObjects;
 
 namespace Authorization.Domain.Entities
@@ -39,7 +40,7 @@ namespace Authorization.Domain.Entities
             IsConfirmed = false;
         }
 
-        internal UserPendingChange(Guid id,
+        public UserPendingChange(Guid id,
             Guid userId,
             string confirmationToken,
             UserChangeType userChangeType,
@@ -62,7 +63,7 @@ namespace Authorization.Domain.Entities
         private static void CheckValidation(Guid userId, string confirmationToken)
         {
             if (userId == Guid.Empty || string.IsNullOrWhiteSpace(confirmationToken))
-                throw new DomainException(DomainErrorCodes.OperationNotAllowed, "Невалідний ідентифікатор користувача або помилка токену підтвердження");
+                throw new BadRequestException(DomainErrorCodes.OperationNotAllowed, "Невалідний ідентифікатор користувача або помилка токену підтвердження");
         }
 
         public static UserPendingChange CreateLoginChange(Guid userId,
@@ -93,7 +94,7 @@ namespace Authorization.Domain.Entities
         public void Confirm(string token)
         {
             if (!CanBeConfirmed(token))
-                throw new DomainException(DomainErrorCodes.OperationNotAllowed, "Токен недійсний, прострочений або вже використаний.");
+                throw new BadRequestException(DomainErrorCodes.OperationNotAllowed, "Токен недійсний, прострочений або вже використаний.");
 
             IsConfirmed = true;
         }

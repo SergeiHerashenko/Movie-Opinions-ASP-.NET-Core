@@ -1,4 +1,5 @@
 ﻿using Authorization.Domain.Exceptions;
+using Authorization.Domain.Exceptions.DomainErrorCode;
 
 namespace Authorization.Domain.ValueObjects
 {
@@ -9,7 +10,7 @@ namespace Authorization.Domain.ValueObjects
         public Password(string hash)
         {
             if (string.IsNullOrWhiteSpace(hash))
-                throw new DomainException(DomainErrorCodes.InvalidPasswordHash, "Хеш пароля не може бути пустим");
+                throw new BadRequestException(DomainErrorCodes.InvalidPasswordHash, "Хеш пароля не може бути пустим");
 
             Hash = hash;
         }

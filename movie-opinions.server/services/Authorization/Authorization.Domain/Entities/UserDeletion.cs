@@ -1,5 +1,6 @@
 ﻿using Authorization.Domain.Common;
 using Authorization.Domain.Exceptions;
+using Authorization.Domain.Exceptions.DomainErrorCode;
 
 namespace Authorization.Domain.Entities
 {
@@ -14,14 +15,14 @@ namespace Authorization.Domain.Entities
         private UserDeletion(Guid userId, string login, string? reason) : base()
         {
             if (userId == Guid.Empty)
-                throw new DomainException(DomainErrorCodes.OperationNotAllowed, "Помилка отримання ідентифікатора користувача!");
+                throw new BadRequestException(DomainErrorCodes.OperationNotAllowed, "Помилка отримання ідентифікатора користувача!");
 
             UserId = userId;
             Login = login;
             Reason = reason;
         }
 
-        internal UserDeletion(Guid id, Guid userId, string login, string? reason, DateTime createdAt)
+        public UserDeletion(Guid id, Guid userId, string login, string? reason, DateTime createdAt)
             :base(id, createdAt)
         {
             UserId = userId;
@@ -32,7 +33,7 @@ namespace Authorization.Domain.Entities
         public static UserDeletion CreateForDeletedUser(User user, string? reason)
         {
             if (user.IsDeleted)
-                throw new DomainException(DomainErrorCodes.UserDeleted, "Користувач вже видалений.");
+                throw new ForbiddenException(DomainErrorCodes.UserDeleted, "Користувач вже видалений.");
 
             return new UserDeletion(user.Id, user.Login.Value, reason);
         }

@@ -1,5 +1,6 @@
 ﻿using Authorization.Domain.Enums;
 using Authorization.Domain.Exceptions;
+using Authorization.Domain.Exceptions.DomainErrorCode;
 
 namespace Authorization.Domain.ValueObjects
 {
@@ -9,16 +10,16 @@ namespace Authorization.Domain.ValueObjects
 
         public LoginType Type { get; }
 
-        public Login(string value, LoginType type)
+        private Login(string value, LoginType type)
         {
             if (string.IsNullOrEmpty(value))
-                throw new DomainException(DomainErrorCodes.InvalidLogin, "Логін не може бути пустим");
+                throw new BadRequestException(DomainErrorCodes.InvalidLogin, "Логін не може бути пустим");
 
             if (type == LoginType.Login_Email && !value.Contains("@"))
-                throw new DomainException(DomainErrorCodes.InvalidLogin, "Для Email логін має містити @");
+                throw new BadRequestException(DomainErrorCodes.InvalidLogin, "Для Email логін має містити @");
 
             if (type == LoginType.Login_Phone && value.Any(char.IsLetter))
-                throw new DomainException(DomainErrorCodes.InvalidLogin, "Телефон не може містити літери");
+                throw new BadRequestException(DomainErrorCodes.InvalidLogin, "Телефон не може містити літери");
 
             Value = value;
             Type = type;
@@ -27,7 +28,7 @@ namespace Authorization.Domain.ValueObjects
         public static Login Create(string rawLogin)
         {
             if (string.IsNullOrEmpty(rawLogin))
-                throw new DomainException(DomainErrorCodes.InvalidLogin, "Логін не може бути порожнім");
+                throw new BadRequestException(DomainErrorCodes.InvalidLogin, "Логін не може бути порожнім");
 
             LoginType type = rawLogin switch
             {
@@ -35,10 +36,15 @@ namespace Authorization.Domain.ValueObjects
 
                 var s when long.TryParse(s.Replace("+", ""), out _) => LoginType.Login_Phone,
 
-                _ => throw new DomainException(DomainErrorCodes.InvalidLogin, "Невідомий формат логіна (очікується Email або Телефон)")
+                _ => throw new BadRequestException(DomainErrorCodes.InvalidLogin, "Невідомий формат логіна (очікується Email або Телефон)")
             };
 
             return new Login(rawLogin, type);
+        }
+
+        public static Login Restore(string value, LoginType loginType)
+        {
+            return new Login(value, loginType);
         }
 
         public override bool Equals(object? obj)

@@ -1,6 +1,7 @@
 ﻿using Authorization.Domain.Common;
 using Authorization.Domain.Enums;
 using Authorization.Domain.Exceptions;
+using Authorization.Domain.Exceptions.DomainErrorCode;
 using Authorization.Domain.ValueObjects;
 
 namespace Authorization.Domain.Entities
@@ -27,7 +28,7 @@ namespace Authorization.Domain.Entities
 
         public bool IsDeleted { get; private set; }
 
-        private User(Login login, Password password, Role role, string? lastLoginIp, bool isConfirmed) : base()
+        private User(Login login, Password password, Role role, string? lastLoginIp) : base()
         {
             Login = login;
             Password = password;
@@ -35,19 +36,19 @@ namespace Authorization.Domain.Entities
             UpdatedAt = null;
             LastLoginAt = null;
             LastLoginIp = lastLoginIp;
-            IsLoginConfirmed = isConfirmed;
+            IsLoginConfirmed = true;
             FailedLoginAttempts = 0;
             IsBlocked = false;
             IsDeleted = false;
         }
 
-        internal User(Guid id, 
+        public User(Guid id, 
             DateTime createdAt, 
             Login login,
             Password password, 
             Role role, 
-            DateTime updateAt,
-            DateTime lastLoginAt,
+            DateTime? updateAt,
+            DateTime? lastLoginAt,
             string? lastLoginIp,
             bool isConfirmed, 
             int failedLoginAttempts, 
@@ -67,9 +68,9 @@ namespace Authorization.Domain.Entities
             IsDeleted = isDeleted;
         }
 
-        public static User CreateNewUser(Login login, Password password, Role role, string? lastLoginIp, bool isConfirmed)
+        public static User CreateNewUser(Login login, Password password, Role role, string? lastLoginIp)
         {
-            return new User(login, password, role, lastLoginIp, isConfirmed);
+            return new User(login, password, role, lastLoginIp);
         }
 
         public void ChangeLogin(Login newLogin)
@@ -84,7 +85,7 @@ namespace Authorization.Domain.Entities
         public void ConfirmLogin()
         {
             if (IsDeleted)
-                throw new DomainException(DomainErrorCodes.UserDeleted, "Неможливо підтвердити логін видаленого користувача.");
+                throw new ForbiddenException(DomainErrorCodes.UserDeleted, "Неможливо підтвердити логін видаленого користувача.");
 
             if (IsLoginConfirmed) return;
 
@@ -95,7 +96,7 @@ namespace Authorization.Domain.Entities
         public void Block()
         {
             if (IsDeleted)
-                throw new DomainException(DomainErrorCodes.UserDeleted,"Неможливо заблокувати видаленого користувача.");
+                throw new ForbiddenException(DomainErrorCodes.UserDeleted,"Неможливо заблокувати видаленого користувача.");
 
             if (IsBlocked) return;
 
@@ -114,14 +115,14 @@ namespace Authorization.Domain.Entities
             {
                 this.Block();
 
-                throw new DomainException(DomainErrorCodes.TooManyLoginAttempts, "Акаунт заблоковано через велику кількість невдалих спроб входу.");
+                throw new BadRequestException(DomainErrorCodes.TooManyLoginAttempts, "Акаунт заблоковано через велику кількість невдалих спроб входу.");
             }
         }
 
         public void LoginSuccess(string ip)
         {
             if(IsDeleted || IsBlocked)
-                throw new DomainException(DomainErrorCodes.UserDeleted, "Неможливо виконати вхід для заблокованого або видаленого користувача.");
+                throw new ForbiddenException(DomainErrorCodes.UserDeleted, "Неможливо виконати вхід для заблокованого або видаленого користувача.");
 
             FailedLoginAttempts = 0;
 
@@ -141,7 +142,7 @@ namespace Authorization.Domain.Entities
         public void ChangePassword(Password newPassword)
         {
             if(IsDeleted)
-                throw new DomainException(DomainErrorCodes.UserDeleted, "Не можна змінити пароль видаленого користувача.");
+                throw new ForbiddenException(DomainErrorCodes.UserDeleted, "Не можна змінити пароль видаленого користувача.");
 
             Password = newPassword;
             UpdatedAt = DateTime.UtcNow;

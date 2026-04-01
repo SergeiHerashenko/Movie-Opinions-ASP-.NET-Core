@@ -1,5 +1,6 @@
 ﻿using Authorization.Domain.Common;
 using Authorization.Domain.Exceptions;
+using Authorization.Domain.Exceptions.DomainErrorCode;
 
 namespace Authorization.Domain.Entities
 {
@@ -28,7 +29,7 @@ namespace Authorization.Domain.Entities
             IsActive = true;
         }
 
-        internal UserRestriction(Guid id,
+        public UserRestriction(Guid id,
             Guid userId,
             string login,
             string? reason,
@@ -49,10 +50,10 @@ namespace Authorization.Domain.Entities
         public static UserRestriction CreateRestrictionForUser(User user, string? reason, string nameBannedBy, DateTime? expiresAt)
         {
             if (user.IsBlocked)
-                throw new DomainException(DomainErrorCodes.UserBlocked, "Користувач вже має активне блокування!");
+                throw new ForbiddenException(DomainErrorCodes.UserBlocked, "Користувач вже має активне блокування!");
 
             if (expiresAt.HasValue && expiresAt.Value <= DateTime.UtcNow)
-                throw new DomainException(DomainErrorCodes.OperationNotAllowed, "Дата закінчення обмеження має бути в майбутньому.");
+                throw new BadRequestException(DomainErrorCodes.OperationNotAllowed, "Дата закінчення обмеження має бути в майбутньому.");
 
             return new UserRestriction(user.Id, user.Login.Value, reason, nameBannedBy, expiresAt);
         }
