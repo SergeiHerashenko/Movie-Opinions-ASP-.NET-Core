@@ -21,6 +21,8 @@
   <ItemGroup>
     <Folder Include="Persistence\Repositories\Dapper\" />
     <Folder Include="Persistence\Repositories\EntityFramework\" />
+    <Folder Include="Persistence\Repositories\Dapper\" />
+    <Folder Include="Persistence\Repositories\EntityFramework\" />
   </ItemGroup>
 
 </Project>

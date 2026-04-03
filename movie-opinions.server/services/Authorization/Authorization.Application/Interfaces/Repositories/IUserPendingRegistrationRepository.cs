@@ -5,6 +5,6 @@ namespace Authorization.Application.Interfaces.Repositories
 {
     public interface IUserPendingRegistrationRepository : IBaseRepository<UserPendingRegistration>
     {
-        Task<UserPendingRegistration?> ExistsByRegistrationLoginAsync(Login login);
+        Task<bool> ExistsByRegistrationLoginAsync(Login login);
     }
 }
