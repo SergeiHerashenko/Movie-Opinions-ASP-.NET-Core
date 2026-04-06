@@ -250,9 +250,9 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
             cmd.Parameters.AddWithValue("@LoginType", entity.Login.Type.ToString());
             cmd.Parameters.AddWithValue("@PasswordHash", entity.Password.Hash);
             cmd.Parameters.AddWithValue("@Role", entity.Role.ToString());
-            cmd.Parameters.AddWithValue("@UpdatedAt", (object?)entity.UpdatedAt ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@LastLoginAt", (object?)entity.LastLoginAt ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@LastLoginIp", (object?)entity.LastLoginIp ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@UpdatedAt", DbValue(entity.UpdatedAt));
+            cmd.Parameters.AddWithValue("@LastLoginAt", DbValue(entity.LastLoginAt));
+            cmd.Parameters.AddWithValue("@LastLoginIp", DbValue(entity.LastLoginIp));
             cmd.Parameters.AddWithValue("@IsConfirmed", entity.IsLoginConfirmed);
             cmd.Parameters.AddWithValue("@FailedLoginAttempts", entity.FailedLoginAttempts);
             cmd.Parameters.AddWithValue("@IsBlocked", entity.IsBlocked);

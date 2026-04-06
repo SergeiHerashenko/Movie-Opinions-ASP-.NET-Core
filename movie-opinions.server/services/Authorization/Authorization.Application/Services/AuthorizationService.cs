@@ -61,7 +61,7 @@ namespace Authorization.Application.Services
             var passwordHash = new Password(_hasher.Hash(registrationCommand.Password));
 
             // 4. Пошук існуючої сесії очікування реєстрації (Staging area)
-            var existingRegistration = await _userPendingRegistrationRepository.ExistsByRegistrationLoginAsync(loginVo);
+            var existingRegistration = await _userPendingRegistrationRepository.GetByLoginAsync(loginVo);
 
             if (existingRegistration != null)
             {
@@ -87,6 +87,7 @@ namespace Authorization.Application.Services
             };
 
             // 7. HTTP виклики до сервісів
+
 
             return Result<RegistrationResult>.Success(new RegistrationResult()
             {

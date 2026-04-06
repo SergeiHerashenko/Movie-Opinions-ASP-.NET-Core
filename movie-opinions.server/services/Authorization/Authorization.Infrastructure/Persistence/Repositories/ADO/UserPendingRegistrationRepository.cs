@@ -127,20 +127,34 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
             });
         }
 
-        public async Task<bool> ExistsByRegistrationLoginAsync(Login login)
+        public async Task<UserPendingRegistration?> GetByLoginAsync(Login login)
         {
             return await ExecuteWithConnectionAsync(async (conn) =>
             {
-                var sql = @"SELECT EXISTS(SELECT 1 FROM Users_Pending_Registration WHERE login = @Login)";
+                var sql = @"
+                        SELECT 
+                            user_id, login_user, login_type, password_hash, created_at, expires_at 
+                        FROM 
+                            Users_Pending_Registration
+                        WHERE 
+                            login = @Login";
 
-                await using (var existsUserCommand = new NpgsqlCommand(sql, conn))
+                await using (var getUserByLoginCommand = new NpgsqlCommand(sql, conn))
                 {
-                    existsUserCommand.Parameters.AddWithValue("@Login", login.Value);
+                    getUserByLoginCommand.Parameters.AddWithValue("@Login", login.Value);
 
-                    var result = await existsUserCommand.ExecuteScalarAsync();
+                    await using (var readerGetUserByLoginCommand = await getUserByLoginCommand.ExecuteReaderAsync())
+                    {
+                        if (await readerGetUserByLoginCommand.ReadAsync())
+                        {
+                            var userEntity = MapReaderToUser(readerGetUserByLoginCommand);
 
-                    return result is bool exists && exists;
+                            return userEntity;
+                        }
+                    }
                 }
+
+                return null;
             });
         }
 

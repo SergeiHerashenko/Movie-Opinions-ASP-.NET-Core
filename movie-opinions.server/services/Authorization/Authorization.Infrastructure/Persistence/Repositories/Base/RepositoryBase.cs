@@ -17,7 +17,7 @@ namespace Authorization.Infrastructure.Persistence.Repositories.Base
             _dbConnectionProvider = dbConnectionProvider;
         }
 
-        protected object DbValue(object? value) => value ?? DBNull.Value;
+        protected static object DbValue(object? value) => value ?? DBNull.Value;
 
         protected async Task<T> ExecuteWithConnectionAsync<T>(Func<NpgsqlConnection, Task<T>> action)
         {
