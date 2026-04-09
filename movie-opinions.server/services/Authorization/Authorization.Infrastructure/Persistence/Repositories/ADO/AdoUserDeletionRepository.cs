@@ -124,14 +124,70 @@ namespace Authorization.Infrastructure.Persistence.Repositories.ADO
             });
         }
 
-        public Task<UserDeletion> GetUserDeletionsByIdAsync(Guid userId)
+        public async Task<UserDeletion?> GetUserDeletionsByIdAsync(Guid userId)
         {
-            
+            return await ExecuteWithConnectionAsync(async (conn) =>
+            {
+                var sql = @"
+                        SELECT 
+                            deletion_id, user_id, login, reason, deleted_at 
+                        FROM 
+                            Users_Deleted 
+                        WHERE 
+                            user_id = @UserId ";
+
+                await using (var getUserDeletionByIdCommand = new NpgsqlCommand(sql, conn))
+                {
+                    getUserDeletionByIdCommand.Parameters.AddWithValue("@UserId", userId);
+
+                    await using (var readerDeletedUserByIdCommand = await getUserDeletionByIdCommand.ExecuteReaderAsync())
+                    {
+                        if (await readerDeletedUserByIdCommand.ReadAsync())
+                        {
+                            var deletedRecordUser = MapReaderToDeleteUser(readerDeletedUserByIdCommand);
+
+                            _logger.LogInformation("Інформація про користувача {Login}, знайдена!", deletedRecordUser.Login);
+
+                            return deletedRecordUser;
+                        }
+                    }
+                }
+
+                return null;
+            });
         }
 
-        public Task<UserDeletion> GetUserDeletionsByLoginAsync(string login)
+        public async Task<UserDeletion?> GetUserDeletionsByLoginAsync(string login)
         {
+            return await ExecuteWithConnectionAsync(async (conn) =>
+            {
+                var sql = @"
+                        SELECT 
+                            deletion_id, user_id, login, reason, deleted_at 
+                        FROM 
+                            Users_Deleted 
+                        WHERE 
+                            login = @Login ";
 
+                await using (var getUserDeletionByLoginCommand = new NpgsqlCommand(sql, conn))
+                {
+                    getUserDeletionByLoginCommand.Parameters.AddWithValue("@Login", login);
+
+                    await using (var readerDeletedUserByLoginCommand = await getUserDeletionByLoginCommand.ExecuteReaderAsync())
+                    {
+                        if (await readerDeletedUserByLoginCommand.ReadAsync())
+                        {
+                            var deletedRecordUser = MapReaderToDeleteUser(readerDeletedUserByLoginCommand);
+
+                            _logger.LogInformation("Інформація про користувача {Login}, знайдена!", deletedRecordUser.Login);
+
+                            return deletedRecordUser;
+                        }
+                    }
+                }
+
+                return null;
+            });
         }
 
         private UserDeletion MapReaderToDeleteUser(NpgsqlDataReader reader)

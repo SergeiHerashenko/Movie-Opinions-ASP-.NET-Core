@@ -1,4 +1,6 @@
-﻿namespace Authorization.Domain.ValueObjects
+﻿using System.Text.Json.Serialization;
+
+namespace Authorization.Domain.ValueObjects
 {
     public class DeviceInfo
     {
@@ -10,6 +12,7 @@
 
         public string? DeviceModel { get; init; }
 
+        [JsonConstructor]
         private DeviceInfo(string deviceType, string os, string browser, string? model)
         {
             DeviceType = deviceType;

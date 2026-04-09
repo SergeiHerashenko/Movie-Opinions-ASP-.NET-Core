@@ -11,9 +11,9 @@ using System.Data;
 
 namespace Authorization.Infrastructure.Persistence.Repositories.ADO
 {
-    public class UserPendingRegistrationRepository : RepositoryBase, IUserPendingRegistrationRepository
+    public class AdoUserPendingRegistrationRepository : RepositoryBase, IUserPendingRegistrationRepository
     {
-        public UserPendingRegistrationRepository(IDbConnectionProvider dbconnectionProvider,
+        public AdoUserPendingRegistrationRepository(IDbConnectionProvider dbconnectionProvider,
             ILogger<AdoUserRepository> logger)
                 : base(logger, dbconnectionProvider){ }
 
